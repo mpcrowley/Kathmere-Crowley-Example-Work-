@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>From Zippers to Know-How — YKK Consulting Play</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#FFFFFF;          /* page background */
+    --card:#F5F7FA;          /* card surface (light gray) */
+    --card-soft:#EAEFF4;     /* secondary surface */
+    --white:#1A1F24;         /* repurposed: main charcoal text / headings */
+    --muted:#46535F;         /* body text */
+    --faint:#8A97A3;         /* faint labels / dividers text */
+    --line:#E4E9ED;          /* light-gray borders & dividers */
+    --accent:#0081BF;        /* YKK brand blue */
+    --glow:rgba(0,129,191,0.30);
+    --ease:cubic-bezier(.22,.61,.36,1);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;width:100%;overflow:hidden;background:var(--navy)}
+  body{
+    font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    color:var(--white);
+    -webkit-font-smoothing:antialiased;
+    text-rendering:optimizeLegibility;
+  }
+
+  /* ===== Slide deck ===== */
+  .deck{position:fixed;inset:0;}
+  /* soft depth for light-theme surfaces */
+  .card,.node,.quad,.tension,.step,.stat,.risk,.info-box,.cmp,.prereq li{
+    box-shadow:0 1px 2px rgba(17,34,51,.04), 0 10px 28px rgba(17,34,51,.05);
+  }
+  .slide{
+    position:absolute;inset:0;
+    display:flex;flex-direction:column;justify-content:safe center;
+    padding:clamp(24px,4vw,64px);
+    padding-bottom:clamp(72px,8vh,96px);
+    opacity:0;visibility:hidden;
+    transform:translateY(14px) scale(.992);
+    transition:opacity .45s var(--ease), transform .45s var(--ease), visibility .45s;
+    overflow-y:auto;
+  }
+  .slide.active{opacity:1;visibility:visible;transform:none;}
+  .slide-inner{
+    width:100%;max-width:1120px;margin:0 auto;
+    display:flex;flex-direction:column;justify-content:center;
+    min-height:min-content;
+  }
+
+  /* Background subtle gradient depth */
+  .deck::before{
+    content:"";position:absolute;inset:0;pointer-events:none;
+    background:
+      radial-gradient(1100px 600px at 82% -10%, rgba(0,129,191,.05), transparent 60%),
+      radial-gradient(900px 500px at 8% 112%, rgba(17,34,51,.025), transparent 55%);
+  }
+
+  /* ===== Typography ===== */
+  .eyebrow{
+    font-size:clamp(11px,1vw,13px);font-weight:600;letter-spacing:.18em;
+    text-transform:uppercase;color:var(--accent);margin-bottom:22px;
+  }
+  h1{font-size:clamp(34px,5.6vw,68px);font-weight:800;line-height:1.04;letter-spacing:-.02em;color:var(--white);}
+  h2{font-size:clamp(22px,2.9vw,38px);font-weight:700;line-height:1.16;letter-spacing:-.015em;color:var(--white);max-width:18ch;}
+  .slide.wide h2{max-width:26ch;}
+  .sub{font-size:clamp(15px,1.7vw,21px);font-weight:300;color:var(--muted);line-height:1.55;max-width:60ch;margin-top:26px;}
+  .label-chip{
+    display:inline-block;margin-top:44px;font-size:12px;font-weight:500;letter-spacing:.04em;
+    color:var(--faint);border:1px solid var(--line);padding:8px 16px;border-radius:100px;
+  }
+  .section-tag{font-size:12px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin-bottom:14px;}
+
+  /* ===== Cards ===== */
+  .card{
+    background:var(--card);border:1px solid var(--line);border-radius:16px;
+    padding:22px 24px;transition:all .3s var(--ease);
+  }
+  .card .ttl{font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:10px;}
+  .card p{font-size:15px;line-height:1.5;color:var(--muted);font-weight:300;}
+
+  /* ===== Slide 1 ===== */
+  #s1 .slide-inner{align-items:flex-start;}
+
+  /* ===== Slide 2 — value chain ===== */
+  /* nudge the whole block up so it sits symmetrically above the footer */
+  #s2{justify-content:safe center;padding-bottom:clamp(110px,17vh,180px);}
+  .chain{display:flex;align-items:stretch;gap:0;margin-top:26px;flex-wrap:wrap;}
+  .node{
+    flex:1;min-width:120px;background:var(--card);border:1px solid var(--line);
+    border-radius:14px;padding:18px 14px;text-align:center;
+    opacity:0;transform:translateY(10px);transition:opacity .45s var(--ease),transform .45s var(--ease);
+    position:relative;
+  }
+  .node.show{opacity:1;transform:none;}
+  .node .n-i{font-size:11px;color:var(--faint);font-weight:600;margin-bottom:8px;letter-spacing:.05em;}
+  .node .n-t{font-size:15px;font-weight:600;color:var(--white);}
+  .arrow{
+    display:flex;align-items:center;justify-content:center;width:34px;flex:0 0 34px;
+    color:var(--accent);font-size:20px;opacity:0;transition:opacity .4s var(--ease);
+  }
+  .arrow.show{opacity:.7;}
+  .knowhow{
+    margin-top:18px;border:1px dashed rgba(0,129,191,.45);background:rgba(0,129,191,.07);
+    border-radius:14px;padding:20px 24px;text-align:center;opacity:0;transform:translateY(8px);
+    transition:opacity .5s var(--ease),transform .5s var(--ease);
+  }
+  .knowhow.show{opacity:1;transform:none;}
+  .knowhow.pulse{animation:glowpulse 2.4s ease-in-out infinite;}
+  .knowhow .kh-t{font-size:17px;font-weight:700;color:var(--white);}
+  .knowhow .kh-s{font-size:13px;color:var(--accent);font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin-top:6px;}
+  @keyframes glowpulse{
+    0%,100%{box-shadow:0 0 0 0 rgba(0,129,191,0);border-color:rgba(0,129,191,.45);}
+    50%{box-shadow:0 0 36px 2px var(--glow);border-color:rgba(0,129,191,.9);}
+  }
+  .hint{font-size:12.5px;color:var(--faint);margin-top:14px;font-weight:400;}
+  .two-cards{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:18px;}
+
+  /* ===== Slide 3 — proposition ===== */
+  .s3-grid{display:grid;grid-template-columns:0.92fr 1.08fr;gap:40px;margin-top:30px;align-items:start;}
+  .blocks{display:flex;flex-direction:column;gap:18px;}
+  .block .b-t{font-size:11.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:6px;}
+  .block p{font-size:13.5px;line-height:1.5;color:var(--muted);font-weight:300;}
+  .matrix-wrap{position:relative;padding-left:34px;padding-top:30px;}
+  .axis-x{
+    position:absolute;top:0;left:34px;right:0;text-align:center;
+    font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);
+  }
+  .axis-y{
+    position:absolute;left:-2px;top:50%;transform:rotate(-180deg) translateX(50%);
+    writing-mode:vertical-rl;text-orientation:mixed;
+    font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);
+    height:auto;
+  }
+  .matrix{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:12px;aspect-ratio:1.18/1;}
+  .quad{
+    background:var(--card-soft);border:1px solid var(--line);border-radius:14px;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;
+    padding:16px;opacity:0;transform:scale(.94);transition:all .5s var(--ease);
+  }
+  .quad.show{opacity:1;transform:none;}
+  .quad .q-l{font-size:10px;color:var(--faint);font-weight:600;letter-spacing:.06em;margin-bottom:8px;text-transform:uppercase;}
+  .quad .q-n{font-size:16px;font-weight:700;color:var(--white);line-height:1.2;}
+  .quad.ykk{background:var(--accent);border-color:var(--accent);box-shadow:0 14px 34px rgba(0,129,191,.30);}
+  .quad.ykk.show{animation:ykkpop .7s var(--ease);}
+  .quad.ykk .q-l{color:rgba(255,255,255,.78);}
+  .quad.ykk .q-n{color:#fff;font-size:22px;font-weight:800;}
+  @keyframes ykkpop{0%{transform:scale(.8);opacity:0;box-shadow:0 0 0 0 var(--glow);}60%{box-shadow:0 0 40px 4px var(--glow);}100%{transform:none;opacity:1;box-shadow:0 0 26px 0 rgba(0,129,191,.35);}}
+  .matrix-cap{font-size:13px;color:var(--muted);margin-top:18px;font-weight:300;line-height:1.5;}
+  .matrix-cap b{color:var(--white);font-weight:600;}
+
+  /* ===== Slide 4 — comparison table ===== */
+  .cmp{margin-top:28px;border:1px solid var(--line);border-radius:16px;overflow:hidden;}
+  .cmp-row{display:grid;grid-template-columns:140px 1fr 1fr;transition:background .3s var(--ease);}
+  .cmp-row:not(:last-child){border-bottom:1px solid var(--line);}
+  .cmp-head{background:#F0F3F6;}
+  .cmp-head .cmp-c{font-size:13px;font-weight:700;letter-spacing:.05em;color:var(--white);}
+  .cmp-head .cmp-c.zip{color:var(--accent);}
+  .cmp-head .cmp-c.con{color:var(--accent);}
+  .cmp-row:not(.cmp-head):hover{background:rgba(0,129,191,.10);}
+  .cmp-k{padding:16px 20px;font-size:12px;font-weight:700;letter-spacing:.08em;color:var(--faint);text-transform:uppercase;display:flex;align-items:center;border-right:1px solid var(--line);}
+  .cmp-c{padding:16px 20px;font-size:14px;line-height:1.45;color:var(--muted);font-weight:300;}
+  .cmp-c.con{border-left:1px solid var(--line);}
+  .tensions{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:24px;}
+  .tension{cursor:pointer;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px;transition:all .3s var(--ease);}
+  .tension:hover{border-color:rgba(0,129,191,.5);transform:translateY(-2px);}
+  .tension .t-h{display:flex;align-items:center;justify-content:space-between;}
+  .tension .t-n{font-size:15px;font-weight:700;color:var(--white);}
+  .tension .t-plus{color:var(--accent);font-size:18px;font-weight:400;transition:transform .3s var(--ease);}
+  .tension.open .t-plus{transform:rotate(45deg);}
+  .tension .t-d{max-height:0;opacity:0;overflow:hidden;transition:max-height .35s var(--ease),opacity .35s var(--ease),margin .35s var(--ease);font-size:13.5px;color:var(--muted);line-height:1.5;font-weight:300;}
+  .tension.open .t-d{max-height:120px;opacity:1;margin-top:12px;}
+
+  /* ===== Slide 5 — flow ===== */
+  .flow{display:flex;align-items:stretch;gap:0;margin-top:30px;flex-wrap:wrap;}
+  .step{
+    flex:1;min-width:200px;cursor:pointer;background:var(--card);border:1px solid var(--line);
+    border-radius:16px;padding:22px;transition:all .3s var(--ease);
+  }
+  .step:hover{border-color:rgba(0,129,191,.55);transform:translateY(-3px);}
+  .step.open{border-color:var(--accent);background:var(--card-soft);}
+  .step .s-i{font-size:11px;font-weight:700;letter-spacing:.1em;color:var(--accent);text-transform:uppercase;margin-bottom:8px;}
+  .step .s-n{font-size:17px;font-weight:700;color:var(--white);display:flex;justify-content:space-between;align-items:center;}
+  .step .s-n .chev{font-size:16px;color:var(--accent);transition:transform .3s var(--ease);}
+  .step.open .s-n .chev{transform:rotate(90deg);}
+  .step .s-d{max-height:0;opacity:0;overflow:hidden;transition:all .35s var(--ease);font-size:13.5px;line-height:1.5;color:var(--muted);font-weight:300;}
+  .step.open .s-d{max-height:160px;opacity:1;margin-top:14px;}
+  .step .pass{display:inline-block;margin-top:10px;font-size:12px;font-weight:600;color:var(--accent);background:rgba(0,129,191,.12);padding:4px 10px;border-radius:6px;}
+  .flow-arrow{display:flex;align-items:center;justify-content:center;width:40px;flex:0 0 40px;color:var(--accent);font-size:22px;opacity:.6;}
+  .info-boxes{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:26px;}
+  .info-box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 22px;}
+  .info-box .i-t{font-size:11.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:8px;}
+  .info-box p{font-size:14px;line-height:1.5;color:var(--muted);font-weight:300;}
+
+  /* ===== Slide 6 — reflection ===== */
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:28px;}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:26px 24px;text-align:center;}
+  .stat .st-v{font-size:clamp(26px,3.4vw,40px);font-weight:800;color:var(--white);letter-spacing:-.02em;line-height:1;}
+  .stat .st-l{font-size:13px;color:var(--muted);font-weight:400;margin-top:12px;line-height:1.4;}
+  .risks{display:flex;flex-direction:column;gap:12px;margin-top:26px;}
+  .risk{cursor:pointer;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 22px;transition:all .3s var(--ease);}
+  .risk:hover{border-color:rgba(0,129,191,.5);}
+  .risk.open{background:var(--card-soft);border-color:var(--accent);}
+  .risk .r-h{display:flex;align-items:center;justify-content:space-between;}
+  .risk .r-rank{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);}
+  .risk .r-n{font-size:16px;font-weight:700;color:var(--white);margin-top:3px;}
+  .risk .r-plus{color:var(--accent);font-size:18px;transition:transform .3s var(--ease);}
+  .risk.open .r-plus{transform:rotate(45deg);}
+  .risk .r-d{max-height:0;opacity:0;overflow:hidden;transition:all .35s var(--ease);font-size:13.5px;line-height:1.5;color:var(--muted);font-weight:300;}
+  .risk.open .r-d{max-height:120px;opacity:1;margin-top:10px;}
+  .prereq{margin-top:26px;}
+  .prereq .p-h{font-size:11.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:14px;}
+  .prereq ol{list-style:none;display:flex;gap:14px;flex-wrap:wrap;}
+  .prereq li{flex:1;min-width:200px;display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 18px;font-size:14px;color:var(--muted);font-weight:300;}
+  .prereq li .num{flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;}
+
+  /* ===== Footer / nav ===== */
+  .footer{
+    position:fixed;left:0;right:0;bottom:0;height:58px;z-index:20;
+    display:flex;align-items:center;justify-content:space-between;
+    padding:0 clamp(20px,4vw,56px);pointer-events:none;
+    font-size:12px;color:var(--faint);
+  }
+  .footer .brand{font-weight:600;letter-spacing:.04em;}
+  .dots{display:flex;gap:10px;pointer-events:auto;}
+  .dot{width:9px;height:9px;border-radius:50%;background:rgba(17,34,51,.18);cursor:pointer;transition:all .3s var(--ease);border:none;padding:0;}
+  .dot:hover{background:rgba(17,34,51,.36);transform:scale(1.2);}
+  .dot.active{background:var(--accent);width:26px;border-radius:5px;}
+  .counter{font-weight:600;letter-spacing:.06em;color:var(--muted);min-width:48px;text-align:right;}
+
+  .nav-arrow{
+    position:fixed;top:50%;transform:translateY(-50%);z-index:21;
+    width:46px;height:46px;border-radius:50%;border:1px solid var(--line);
+    background:#fff;color:var(--white);cursor:pointer;
+    display:flex;align-items:center;justify-content:center;font-size:20px;
+    transition:all .3s var(--ease);box-shadow:0 2px 10px rgba(17,34,51,.08);
+  }
+  .nav-arrow:hover{background:rgba(0,129,191,.2);border-color:var(--accent);}
+  .nav-arrow:disabled{opacity:.25;cursor:default;}
+  .nav-arrow.prev{left:18px;}
+  .nav-arrow.next{right:18px;}
+
+  .progress{position:fixed;top:0;left:0;height:3px;background:var(--accent);z-index:30;transition:width .45s var(--ease);box-shadow:0 0 12px var(--glow);}
+
+  @media(max-width:760px){
+    .s3-grid{grid-template-columns:1fr;gap:26px;}
+    .two-cards,.info-boxes,.stats,.tensions{grid-template-columns:1fr;}
+    .stats{grid-template-columns:1fr;}
+    .flow,.chain{flex-direction:column;}
+    .flow-arrow,.arrow{width:100%;height:28px;transform:rotate(90deg);}
+    .cmp-row{grid-template-columns:1fr;}
+    .cmp-k{border-right:none;border-bottom:1px solid var(--line);}
+    .cmp-c.con{border-left:none;}
+    .nav-arrow{display:none;}
+    .footer .brand{display:none;}
+  }
+</style>
+</head>
+<body>
+<div class="progress" id="progress"></div>
+<div class="deck" id="deck">
+
+  <!-- SLIDE 1 -->
+  <section class="slide" id="s1">
+    <div class="slide-inner">
+      <div class="eyebrow">YKK Consulting Play</div>
+      <h1>From Zippers<br>to Know-How</h1>
+      <p class="sub">YKK's unmonetised manufacturing expertise can become a second revenue stream, tested at low cost before any capital is committed.</p>
+      <span class="label-chip">MN5862 &nbsp;|&nbsp; Entrepreneurial Mindset &nbsp;|&nbsp; Group Project</span>
+    </div>
+  </section>
+
+  <!-- SLIDE 2 -->
+  <section class="slide wide" id="s2">
+    <div class="slide-inner">
+      <div class="section-tag">01 — Diagnosis</div>
+      <h2>YKK's vertical integration has produced a second asset beyond zippers — decades of manufacturing know-how, currently unmonetised.</h2>
+
+      <div class="chain" id="chain">
+        <div class="node" data-i="0"><div class="n-i">01</div><div class="n-t">Brass</div></div>
+        <div class="arrow" data-a="0">&#8594;</div>
+        <div class="node" data-i="1"><div class="n-i">02</div><div class="n-t">Polyester</div></div>
+        <div class="arrow" data-a="1">&#8594;</div>
+        <div class="node" data-i="2"><div class="n-i">03</div><div class="n-t">Machinery</div></div>
+        <div class="arrow" data-a="2">&#8594;</div>
+        <div class="node" data-i="3"><div class="n-i">04</div><div class="n-t">Assembly</div></div>
+        <div class="arrow" data-a="3">&#8594;</div>
+        <div class="node" data-i="4"><div class="n-i">05</div><div class="n-t">Zipper Sales</div></div>
+      </div>
+
+      <div class="knowhow" id="knowhow">
+        <div class="kh-t">Manufacturing know-how</div>
+        <div class="kh-s">Currently unmonetised</div>
+      </div>
+
+      <div class="hint" id="s2hint">Click anywhere to reveal the value chain &#8594;</div>
+
+      <div class="two-cards">
+        <div class="card"><div class="ttl">Market Position</div><p>~45% of the global premium fastener market, with sticky, long-tenured customers.</p></div>
+        <div class="card"><div class="ttl">Regulatory Tailwind</div><p>EU Ecodesign 2024 + CS3D force documentation of durability and traceability — exactly what YKK already has.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SLIDE 3 -->
+  <section class="slide wide" id="s3">
+    <div class="slide-inner">
+      <div class="section-tag">02 — Proposition</div>
+      <h2>A consulting service to mid-sized industrial manufacturers turns this know-how into revenue without cannibalising the core.</h2>
+
+      <div class="s3-grid">
+        <div class="blocks">
+          <div class="block">
+            <div class="b-t">How we got here</div>
+            <p>Applied the Business Model Navigator (Gassmann et al., 2020). Three patterns fell away: Circular Economy, Customer Data, White Label. <b style="color:var(--white);font-weight:500">Make More of It</b> is what remains.</p>
+          </div>
+          <div class="block">
+            <div class="b-t">Who</div>
+            <p>Mid-sized manufacturers in automotive supply, medical devices, precision electronics (€50–500m revenue) — too small for McKinsey/BCG, too technically demanding for generic consultants.</p>
+          </div>
+          <div class="block">
+            <div class="b-t">What</div>
+            <p>Paid diagnostics, process redesign, ramp-up support at day rates with outcome-linked fees tied to agreed KPIs.</p>
+          </div>
+          <div class="block">
+            <div class="b-t">Why defensible</div>
+            <p>AWS and Festo proved the pattern works. Talon, SBS, and Riri cannot replicate YKK's practitioner depth.</p>
+          </div>
+        </div>
+
+        <div>
+          <div class="matrix-wrap">
+            <div class="axis-x">Generic &#8594; Specialist</div>
+            <div class="axis-y">Practitioner &#8594; Strategic</div>
+            <div class="matrix" id="matrix">
+              <div class="quad" data-q="tl"><div class="q-l">Generic · Practitioner</div><div class="q-n">Machine vendors</div></div>
+              <div class="quad ykk" data-q="tr"><div class="q-l">Specialist · Practitioner</div><div class="q-n">YKK</div></div>
+              <div class="quad" data-q="bl"><div class="q-l">Generic · Strategic</div><div class="q-n">McKinsey / BCG</div></div>
+              <div class="quad" data-q="br"><div class="q-l">Specialist · Strategic</div><div class="q-n">Bosch / Porsche Consulting</div></div>
+            </div>
+          </div>
+          <p class="matrix-cap">The <b>Specialist + Practitioner</b> quadrant is unoccupied by any competitor.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SLIDE 4 -->
+  <section class="slide wide" id="s4">
+    <div class="slide-inner">
+      <div class="section-tag">03 — Integration</div>
+      <h2>Internal and external consistency holds, provided three known tensions are managed up front.</h2>
+
+      <div class="cmp">
+        <div class="cmp-row cmp-head">
+          <div class="cmp-k">&nbsp;</div>
+          <div class="cmp-c zip">Zipper Business</div>
+          <div class="cmp-c con">Consulting Unit</div>
+        </div>
+        <div class="cmp-row">
+          <div class="cmp-k">Who</div>
+          <div class="cmp-c">Luxury and mass-market apparel brands, industrial OEMs</div>
+          <div class="cmp-c con">Mid-sized industrial manufacturers</div>
+        </div>
+        <div class="cmp-row">
+          <div class="cmp-k">What</div>
+          <div class="cmp-c">Zero-failure fasteners</div>
+          <div class="cmp-c con">Process diagnostics, redesign, ramp-up support</div>
+        </div>
+        <div class="cmp-row">
+          <div class="cmp-k">How</div>
+          <div class="cmp-c">Fully vertically integrated production</div>
+          <div class="cmp-c con">Seconded engineers, codified methods, separate P&amp;L</div>
+        </div>
+        <div class="cmp-row">
+          <div class="cmp-k">Value</div>
+          <div class="cmp-c">Premium margin on volume</div>
+          <div class="cmp-c con">Day rates plus outcome-linked fees</div>
+        </div>
+      </div>
+
+      <div class="tensions" id="tensions">
+        <div class="tension">
+          <div class="t-h"><span class="t-n">Capacity</span><span class="t-plus">+</span></div>
+          <div class="t-d">Senior engineers cannot be backfilled.</div>
+        </div>
+        <div class="tension">
+          <div class="t-h"><span class="t-n">IP</span><span class="t-plus">+</span></div>
+          <div class="t-d">The line between generic and proprietary knowledge must be drawn explicitly.</div>
+        </div>
+        <div class="tension">
+          <div class="t-h"><span class="t-n">Culture</span><span class="t-plus">+</span></div>
+          <div class="t-d">Separate metrics and career path needed.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SLIDE 5 -->
+  <section class="slide wide" id="s5">
+    <div class="slide-inner">
+      <div class="section-tag">04 — Implementation</div>
+      <h2>The model's two critical assumptions can be tested at low cost before any capital is committed.</h2>
+
+      <div class="flow" id="flow">
+        <div class="step">
+          <div class="s-i">Test 1</div>
+          <div class="s-n">Customer Discovery <span class="chev">&#8250;</span></div>
+          <div class="s-d">10–15 interviews with operations leaders.<span class="pass">Pass: ≥60% report an unsolved recurring production problem.</span></div>
+        </div>
+        <div class="flow-arrow">&#8594;</div>
+        <div class="step">
+          <div class="s-i">Test 2</div>
+          <div class="s-n">Capability Transfer <span class="chev">&#8250;</span></div>
+          <div class="s-d">A non-YKK manager applies one YKK diagnostic method.<span class="pass">Pass: credible diagnosis with minimal YKK support.</span></div>
+        </div>
+        <div class="flow-arrow">&#8594;</div>
+        <div class="step">
+          <div class="s-i">Commit</div>
+          <div class="s-n">Commercial Pilot <span class="chev">&#8250;</span></div>
+          <div class="s-d">One mid-sized client, fixed scope, 8–12 weeks, two seconded engineers.<span class="pass">Proceed only if both tests pass.</span></div>
+        </div>
+      </div>
+
+      <div class="info-boxes">
+        <div class="info-box">
+          <div class="i-t">Sequencing</div>
+          <p>Run Test 1 first. Stop if it fails. Commit to pilot only if both confirm.</p>
+        </div>
+        <div class="info-box">
+          <div class="i-t">Exposure</div>
+          <p>Two or three senior engineers, ~16 weeks. No new hires, no infrastructure.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SLIDE 6 -->
+  <section class="slide wide" id="s6">
+    <div class="slide-inner">
+      <div class="section-tag">05 — Reflection</div>
+      <h2>Investment is modest, break-even is plausible in year 2–3, and the main risk is internal capacity, not the market.</h2>
+
+      <div class="stats" id="stats">
+        <div class="stat"><div class="st-v" data-count data-prefix="€" data-from="4" data-to="9" data-suffix="m">€0m</div><div class="st-l">Annual revenue<br>(€4–9m range)</div></div>
+        <div class="stat"><div class="st-v" data-count data-prefix="€" data-from="1" data-to="2" data-suffix="m">€0m</div><div class="st-l">Annual overhead<br>(€1–2m range)</div></div>
+        <div class="stat"><div class="st-v" data-count data-prefix="Year " data-from="2" data-to="3" data-suffix="">Year 0</div><div class="st-l">Break-even<br>horizon</div></div>
+      </div>
+
+      <div class="risks" id="risks">
+        <div class="risk">
+          <div class="r-h"><div><div class="r-rank">Primary</div><div class="r-n">Internal Capacity</div></div><span class="r-plus">+</span></div>
+          <div class="r-d">Senior engineering time is the binding constraint — the people who can deliver are the same people the core business needs.</div>
+        </div>
+        <div class="risk">
+          <div class="r-h"><div><div class="r-rank">Secondary</div><div class="r-n">External Credibility</div></div><span class="r-plus">+</span></div>
+          <div class="r-d">YKK is unproven as a consultancy; early references and a focused pilot are needed to establish standing.</div>
+        </div>
+        <div class="risk">
+          <div class="r-h"><div><div class="r-rank">Tertiary</div><div class="r-n">Brand Dilution</div></div><span class="r-plus">+</span></div>
+          <div class="r-d">Managed via a separate unit and disciplined scope so the core fastener brand is not diluted.</div>
+        </div>
+      </div>
+
+      <div class="prereq">
+        <div class="p-h">Prerequisites</div>
+        <ol>
+          <li><span class="num">1</span> External commercial leader</li>
+          <li><span class="num">2</span> Separate incentive structure</li>
+          <li><span class="num">3</span> Pre-approved IP framework</li>
+        </ol>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<!-- Nav -->
+<button class="nav-arrow prev" id="prev" aria-label="Previous slide">&#8249;</button>
+<button class="nav-arrow next" id="next" aria-label="Next slide">&#8250;</button>
+
+<div class="footer">
+  <div class="brand">YKK Consulting Play</div>
+  <div class="dots" id="dots"></div>
+  <div class="counter" id="counter">1 / 6</div>
+</div>
+
+<script>
+(function(){
+  const slides = Array.from(document.querySelectorAll('.slide'));
+  const total = slides.length;
+  let current = 0;
+
+  const dotsWrap = document.getElementById('dots');
+  const counter = document.getElementById('counter');
+  const progress = document.getElementById('progress');
+  const prevBtn = document.getElementById('prev');
+  const nextBtn = document.getElementById('next');
+
+  // Build dots
+  slides.forEach((_, i) => {
+    const b = document.createElement('button');
+    b.className = 'dot';
+    b.setAttribute('aria-label', 'Go to slide ' + (i+1));
+    b.addEventListener('click', () => goTo(i));
+    dotsWrap.appendChild(b);
+  });
+  const dots = Array.from(dotsWrap.children);
+
+  function render(){
+    slides.forEach((s,i)=> s.classList.toggle('active', i===current));
+    dots.forEach((d,i)=> d.classList.toggle('active', i===current));
+    counter.textContent = (current+1) + ' / ' + total;
+    progress.style.width = ((current+1)/total*100) + '%';
+    prevBtn.disabled = current===0;
+    nextBtn.disabled = current===total-1;
+    triggerSlide(current);
+  }
+
+  function goTo(i){
+    if(i<0||i>=total||i===current) { if(i===current) return; }
+    current = Math.max(0, Math.min(total-1, i));
+    render();
+  }
+  function next(){ goTo(current+1); }
+  function prev(){ goTo(current-1); }
+
+  prevBtn.addEventListener('click', prev);
+  nextBtn.addEventListener('click', next);
+
+  document.addEventListener('keydown', (e)=>{
+    if(e.key==='ArrowRight' || e.key===' ' || e.key==='PageDown'){ e.preventDefault(); next(); }
+    else if(e.key==='ArrowLeft' || e.key==='PageUp'){ e.preventDefault(); prev(); }
+    else if(e.key==='Home'){ goTo(0); }
+    else if(e.key==='End'){ goTo(total-1); }
+  });
+
+  // Touch swipe
+  let tsx=0, tsy=0;
+  document.addEventListener('touchstart', e=>{ tsx=e.changedTouches[0].clientX; tsy=e.changedTouches[0].clientY; }, {passive:true});
+  document.addEventListener('touchend', e=>{
+    const dx = e.changedTouches[0].clientX - tsx;
+    const dy = e.changedTouches[0].clientY - tsy;
+    if(Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy)){
+      if(dx < 0) next(); else prev();
+    }
+  }, {passive:true});
+
+  /* ============ Per-slide interactions ============ */
+
+  // --- Slide 2: value chain click reveal ---
+  const nodes = Array.from(document.querySelectorAll('#chain .node'));
+  const arrows = Array.from(document.querySelectorAll('#chain .arrow'));
+  const knowhow = document.getElementById('knowhow');
+  const s2hint = document.getElementById('s2hint');
+  let chainStep = 0; // number of nodes revealed
+  const chainMax = nodes.length;
+
+  function advanceChain(){
+    if(chainStep < chainMax){
+      nodes[chainStep].classList.add('show');
+      if(chainStep>0) arrows[chainStep-1].classList.add('show');
+      chainStep++;
+      if(chainStep === chainMax){
+        s2hint.textContent = 'Five stages of integration → one untapped asset.';
+        setTimeout(()=>{
+          knowhow.classList.add('show');
+          setTimeout(()=> knowhow.classList.add('pulse'), 500);
+        }, 350);
+      } else {
+        s2hint.textContent = 'Keep clicking to reveal the chain (' + chainStep + '/' + chainMax + ')';
+      }
+    }
+  }
+  function resetChain(){
+    chainStep = 0;
+    nodes.forEach(n=>n.classList.remove('show'));
+    arrows.forEach(a=>a.classList.remove('show'));
+    knowhow.classList.remove('show','pulse');
+    s2hint.textContent = 'Click anywhere to reveal the value chain →';
+  }
+  document.getElementById('s2').addEventListener('click', (e)=>{
+    if(e.target.closest('.card')) return; // don't hijack support cards
+    advanceChain();
+  });
+
+  // --- Slide 3: matrix staged reveal ---
+  const quads = Array.from(document.querySelectorAll('#matrix .quad'));
+  function revealMatrix(){
+    // competitors first, YKK last
+    const order = ['tl','bl','br','tr'];
+    order.forEach((q, idx)=>{
+      const el = quads.find(x=>x.dataset.q===q);
+      setTimeout(()=> el.classList.add('show'), 250 + idx*320);
+    });
+  }
+  function resetMatrix(){ quads.forEach(q=>q.classList.remove('show')); }
+
+  // --- Slide 4: tensions expand ---
+  document.querySelectorAll('#tensions .tension').forEach(t=>{
+    t.addEventListener('click', ()=> t.classList.toggle('open'));
+  });
+
+  // --- Slide 5: steps expand ---
+  document.querySelectorAll('#flow .step').forEach(s=>{
+    s.addEventListener('click', ()=> s.classList.toggle('open'));
+  });
+
+  // --- Slide 6: count-up + risks ---
+  document.querySelectorAll('#risks .risk').forEach(r=>{
+    r.addEventListener('click', ()=> r.classList.toggle('open'));
+  });
+  const statEls = Array.from(document.querySelectorAll('#stats [data-count]'));
+  function runCount(){
+    statEls.forEach(el=>{
+      const from = parseInt(el.dataset.from,10);
+      const to = parseInt(el.dataset.to,10);
+      const pre = el.dataset.prefix || '';
+      const suf = el.dataset.suffix || '';
+      const dur = 1100;
+      const start = performance.now();
+      function frame(now){
+        const p = Math.min((now-start)/dur, 1);
+        const eased = 1 - Math.pow(1-p, 3);
+        const val = Math.round(from + (to-from)*eased);
+        // show range once complete on the multi-value ones
+        if(p>=1 && to!==from){
+          el.textContent = pre + from + '–' + to + suf;
+        } else {
+          el.textContent = pre + val + suf;
+        }
+        if(p<1) requestAnimationFrame(frame);
+      }
+      requestAnimationFrame(frame);
+    });
+  }
+  function resetCount(){
+    statEls.forEach(el=>{
+      const pre = el.dataset.prefix || '';
+      const suf = el.dataset.suffix || '';
+      el.textContent = pre + '0' + suf;
+    });
+  }
+
+  // Track which slides have already auto-animated
+  const seen = {};
+  function triggerSlide(i){
+    const id = slides[i].id;
+    if(id === 's2'){ /* chain is click-driven; nothing auto */ }
+    if(id === 's3'){
+      resetMatrix();
+      revealMatrix();
+    }
+    if(id === 's6'){
+      resetCount();
+      setTimeout(runCount, 250);
+    }
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>
