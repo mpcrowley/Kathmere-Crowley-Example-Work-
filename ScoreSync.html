@@ -1,0 +1,1804 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ScoreSync — Simplifying university sport coordination</title>
+  <meta name="description" content="ScoreSync helps university sports teams schedule fixtures, manage events, and keep everyone updated in one simple place." />
+
+  <!-- React + ReactDOM (pinned versions for reproducibility) -->
+  <script crossorigin src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+  <!-- Babel for in-browser JSX (pinned) -->
+  <script src="https://unpkg.com/@babel/standalone@7.23.10/babel.min.js"></script>
+  <!-- Tailwind -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            navy: {
+              50:  '#f2f5fa',
+              100: '#dde6f2',
+              700: '#16335c',
+              800: '#102544',
+              900: '#0b1a2f',
+              950: '#07121f',
+            },
+            accent: {
+              50:  '#eff6ff',
+              100: '#dbeafe',
+              200: '#bfdbfe',
+              400: '#60a5fa',
+              500: '#3b82f6',
+              600: '#2563eb',
+              700: '#1d4ed8',
+            },
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
+          },
+          boxShadow: {
+            card: '0 1px 3px rgba(11,26,47,0.08), 0 1px 2px rgba(11,26,47,0.04)',
+            cardhover: '0 8px 24px rgba(11,26,47,0.12)',
+          },
+        },
+      },
+    };
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    html { scroll-behavior: smooth; }
+    body { background: #f2f5fa; }
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    .fade-in { animation: fade .25s ease both; }
+    @keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+    .toast-in { animation: toastin .3s cubic-bezier(.2,.8,.2,1) both; }
+    @keyframes toastin { from { opacity: 0; transform: translateY(12px) scale(.98); } to { opacity: 1; transform: none; } }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- App source kept as text/plain so Babel does NOT auto-run it; we transform it
+       ourselves below with the classic JSX runtime (avoids emitted import statements). -->
+  <script type="text/plain" id="app-source">
+    const { useState, useEffect, useMemo, useRef, createContext, useContext, useCallback } = React;
+
+    /* ============================================================
+       CONSTANTS
+    ============================================================ */
+    const SPORTS = ['Football', 'Rugby', 'Hockey', 'Netball', 'Basketball', 'Tennis', 'Athletics', 'Golf'];
+    const EVENT_TYPES = ['Fixture', 'Training', 'Trial', 'Meeting', 'Tournament', 'Social'];
+    const STATUSES = ['Draft', 'Published', 'Postponed', 'Cancelled', 'Completed'];
+    const VISIBILITIES = ['Public', 'Team-only', 'Admin-only'];
+    const HOME_AWAY = ['Home', 'Away', 'Neutral'];
+    const CATEGORIES = ["Men's", "Women's", 'Mixed', 'Development', 'BUCS', 'Social'];
+
+    const STATUS_STYLES = {
+      Draft:     { badge: 'bg-slate-100 text-slate-600 ring-1 ring-slate-200', dot: 'bg-slate-400', bar: 'bg-slate-300' },
+      Published: { badge: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200', dot: 'bg-emerald-500', bar: 'bg-emerald-500' },
+      Postponed: { badge: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200', dot: 'bg-amber-500', bar: 'bg-amber-500' },
+      Cancelled: { badge: 'bg-rose-50 text-rose-700 ring-1 ring-rose-200', dot: 'bg-rose-500', bar: 'bg-rose-500' },
+      Completed: { badge: 'bg-slate-100 text-slate-500 ring-1 ring-slate-200', dot: 'bg-slate-400', bar: 'bg-slate-400' },
+    };
+
+    const SPORT_EMOJI = {
+      Football: '⚽', Rugby: '🏉', Hockey: '🏑', Netball: '🥅',
+      Basketball: '🏀', Tennis: '🎾', Athletics: '🏃', Golf: '⛳',
+    };
+
+    /* ============================================================
+       SAMPLE DATA  (anchored around 2026-06-08)
+    ============================================================ */
+    const uid = (() => { let n = 100; return () => 'id' + (++n); })();
+
+    const seedTeams = [
+      { id: 't1', name: "Men's Football 1st Team", sport: 'Football', category: "Men's", captain: 'James Whitfield', email: 'mens.football@uni.ac.uk', notes: 'BUCS Premier North.' },
+      { id: 't2', name: "Women's Hockey 2nd Team", sport: 'Hockey', category: "Women's", captain: 'Sophie Aldridge', email: 'womens.hockey2@uni.ac.uk', notes: 'Development-focused squad.' },
+      { id: 't3', name: 'Netball 1st Team', sport: 'Netball', category: "Women's", captain: 'Priya Nair', email: 'netball1@uni.ac.uk', notes: 'BUCS Tier 1.' },
+      { id: 't4', name: "Rugby Union Men's", sport: 'Rugby', category: "Men's", captain: 'Tom Bryce', email: 'mens.rugby@uni.ac.uk', notes: 'Home matches at Main Grass Pitch.' },
+      { id: 't5', name: 'Golf Performance Squad', sport: 'Golf', category: 'Development', captain: 'Coach R. Mehta', email: 'golf.squad@uni.ac.uk', notes: 'Performance programme athletes.' },
+      { id: 't6', name: "Men's Basketball 1st Team", sport: 'Basketball', category: "Men's", captain: 'Marcus Lee', email: 'mens.basketball@uni.ac.uk', notes: '' },
+      { id: 't7', name: "Women's Football 1st Team", sport: 'Football', category: "Women's", captain: 'Ella Donovan', email: 'womens.football@uni.ac.uk', notes: '' },
+      { id: 't8', name: 'Athletics Squad', sport: 'Athletics', category: 'Mixed', captain: 'Coach D. Owusu', email: 'athletics@uni.ac.uk', notes: 'Track & field.' },
+      { id: 't9', name: 'Tennis Mixed Team', sport: 'Tennis', category: 'Mixed', captain: 'Harry Quinn', email: 'tennis@uni.ac.uk', notes: '' },
+    ];
+
+    const seedVenues = [
+      { id: 'v1', name: 'University Sports Centre', address: 'Carrington Road, Campus East', type: 'Indoor', capacity: '500', notes: 'Main reception, changing rooms, parking on-site.' },
+      { id: 'v2', name: 'Main Grass Pitch', address: 'North Playing Fields', type: 'Outdoor', capacity: '300', notes: 'Floodlit. Spectator rope only.' },
+      { id: 'v3', name: 'Astroturf Pitch', address: 'North Playing Fields', type: 'Outdoor', capacity: '150', notes: 'Sand-dressed astro. Boots only — no metal studs.' },
+      { id: 'v4', name: 'Indoor Sports Hall', address: 'University Sports Centre, Level 1', type: 'Indoor', capacity: '250', notes: 'Courts 1–4. Spectator gallery upstairs.' },
+      { id: 'v5', name: 'Tennis Courts', address: 'South Campus Courts', type: 'Outdoor', capacity: '60', notes: '6 hard courts.' },
+      { id: 'v6', name: 'Golf Club', address: 'Meadowside Golf Club (off-campus)', type: 'Outdoor', capacity: '', notes: '15-minute drive. Meet at clubhouse.' },
+    ];
+
+    // Dates relative to "today" (2026-06-08) for a lively demo
+    const d = (offsetDays) => {
+      const base = new Date(Date.UTC(2026, 5, 8));
+      base.setUTCDate(base.getUTCDate() + offsetDays);
+      return base.toISOString().slice(0, 10);
+    };
+
+    const mk = (o) => ({
+      opponent: '', locationNotes: '', homeAway: 'Home', transport: '',
+      arrivalTime: '', notes: '', endTime: '', visibility: 'Public',
+      updatedAt: new Date('2026-06-05T09:00:00').toISOString(),
+      log: [{ time: new Date('2026-06-05T09:00:00').toISOString(), text: 'Event created' }],
+      ...o,
+    });
+
+    const seedEvents = [
+      mk({ id: 'e1', title: 'Men’s Football vs Northgate University', sport: 'Football', teamId: 't1', opponent: 'Northgate University', type: 'Fixture', date: d(0), startTime: '14:00', endTime: '16:00', venueId: 'v2', homeAway: 'Home', arrivalTime: '13:00', transport: 'N/A — home fixture', notes: 'BUCS league fixture. Warm-up from 13:15. Bring both kits.', status: 'Published', locationNotes: 'Enter via North Playing Fields gate.' }),
+      mk({ id: 'e2', title: 'Netball 1st Team vs City College', sport: 'Netball', teamId: 't3', opponent: 'City College', type: 'Fixture', date: d(0), startTime: '15:00', endTime: '16:30', venueId: 'v4', homeAway: 'Home', arrivalTime: '14:15', notes: 'Court 1. Umpires confirmed.', status: 'Published' }),
+      mk({ id: 'e3', title: 'Rugby Union Men’s — Training', sport: 'Rugby', teamId: 't4', type: 'Training', date: d(1), startTime: '18:00', endTime: '19:30', venueId: 'v2', homeAway: 'Home', arrivalTime: '17:45', notes: 'Conditioning + lineout work. Bring gum shields.', status: 'Published' }),
+      mk({ id: 'e4', title: 'Women’s Hockey 2nd vs Riverside University', sport: 'Hockey', teamId: 't2', opponent: 'Riverside University', type: 'Fixture', date: d(2), startTime: '13:00', endTime: '14:30', venueId: 'v3', homeAway: 'Away', arrivalTime: '11:30', transport: 'Minibus departs Sports Centre 11:45 sharp.', notes: 'Away at Riverside astro. Bring £5 for post-match.', status: 'Published', locationNotes: 'Riverside University, Mill Lane astro.' }),
+      mk({ id: 'e5', title: 'Golf Performance Squad — Practice Round', sport: 'Golf', teamId: 't5', type: 'Training', date: d(3), startTime: '09:00', endTime: '12:00', venueId: 'v6', homeAway: 'Neutral', arrivalTime: '08:30', transport: 'Car share — meet Sports Centre car park 08:00.', notes: 'Stableford practice. Bring own clubs.', status: 'Published' }),
+      mk({ id: 'e6', title: 'Men’s Basketball vs Eastfield', sport: 'Basketball', teamId: 't6', opponent: 'Eastfield University', type: 'Fixture', date: d(2), startTime: '19:00', endTime: '21:00', venueId: 'v4', homeAway: 'Home', arrivalTime: '18:00', notes: 'Court 2. Live scoreboard operator needed.', status: 'Postponed', locationNotes: 'Indoor Sports Hall, Court 2.',
+        log: [
+          { time: new Date('2026-06-04T10:00:00').toISOString(), text: 'Event created' },
+          { time: new Date('2026-06-06T16:20:00').toISOString(), text: 'Event marked as postponed' },
+          { time: new Date('2026-06-06T16:21:00').toISOString(), text: 'Note added: opponent travel disruption — new date TBC' },
+        ],
+        updatedAt: new Date('2026-06-06T16:21:00').toISOString(),
+      }),
+      mk({ id: 'e7', title: 'Athletics Squad — Track Session', sport: 'Athletics', teamId: 't8', type: 'Training', date: d(4), startTime: '17:30', endTime: '19:00', venueId: 'v2', homeAway: 'Home', arrivalTime: '17:15', notes: 'Speed endurance. Spikes recommended.', status: 'Published' }),
+      mk({ id: 'e8', title: 'Tennis Mixed — Selection Trial', sport: 'Tennis', teamId: 't9', type: 'Trial', date: d(5), startTime: '10:00', endTime: '13:00', venueId: 'v5', homeAway: 'Home', arrivalTime: '09:45', notes: 'Trials for next season squad. All welcome.', status: 'Published' }),
+      mk({ id: 'e9', title: 'Women’s Football vs Harborough (TBC)', sport: 'Football', teamId: 't7', opponent: 'Harborough University', type: 'Fixture', date: d(7), startTime: '14:00', endTime: '16:00', venueId: 'v3', homeAway: 'Home', arrivalTime: '13:00', notes: 'Awaiting opponent confirmation.', status: 'Draft', visibility: 'Admin-only' }),
+      mk({ id: 'e10', title: 'Club Captains Meeting — End of Season', sport: 'Football', teamId: 't1', type: 'Meeting', date: d(6), startTime: '18:00', endTime: '19:00', venueId: 'v1', homeAway: 'Home', notes: 'All club captains. Awards & next year planning.', status: 'Published', visibility: 'Team-only' }),
+      mk({ id: 'e11', title: 'Summer Sports Social', sport: 'Athletics', teamId: 't8', type: 'Social', date: d(9), startTime: '19:30', endTime: '23:00', venueId: 'v1', homeAway: 'Home', notes: 'End of year celebration. Tickets at SU desk.', status: 'Published' }),
+      mk({ id: 'e12', title: 'Rugby 7s Invitational Tournament', sport: 'Rugby', teamId: 't4', opponent: 'Multiple universities', type: 'Tournament', date: d(12), startTime: '09:00', endTime: '17:00', venueId: 'v2', homeAway: 'Home', arrivalTime: '08:00', notes: '8-team round robin + finals. Volunteers needed.', status: 'Published' }),
+      mk({ id: 'e13', title: 'Men’s Football vs Westbrook (played)', sport: 'Football', teamId: 't1', opponent: 'Westbrook University', type: 'Fixture', date: d(-3), startTime: '14:00', endTime: '16:00', venueId: 'v2', homeAway: 'Home', arrivalTime: '13:00', notes: 'Final score 2–1. Great win.', status: 'Completed' }),
+      // Deliberate venue double-booking with e2 (Indoor Sports Hall, Mon 15:00–16:30) to demonstrate clash detection
+      mk({ id: 'e15', title: 'Men’s Basketball — Shootaround', sport: 'Basketball', teamId: 't6', type: 'Training', date: d(0), startTime: '16:00', endTime: '17:30', venueId: 'v4', homeAway: 'Home', arrivalTime: '15:45', notes: 'Light session before the weekend.', status: 'Published' }),
+      mk({ id: 'e14', title: 'Netball Training (cancelled — court flooded)', sport: 'Netball', teamId: 't3', type: 'Training', date: d(1), startTime: '17:00', endTime: '18:30', venueId: 'v4', homeAway: 'Home', notes: 'Cancelled due to leak in Sports Hall. Rescheduled TBC.', status: 'Cancelled',
+        log: [
+          { time: new Date('2026-06-03T09:00:00').toISOString(), text: 'Event created' },
+          { time: new Date('2026-06-07T08:10:00').toISOString(), text: 'Event marked as cancelled' },
+        ],
+        updatedAt: new Date('2026-06-07T08:10:00').toISOString(),
+      }),
+    ];
+
+    /* ============================================================
+       STORE (localStorage-backed)
+    ============================================================ */
+    const LS_KEY = 'scoresync_v1';
+    // Safe storage wrappers — Safari can throw a SecurityError when accessing
+    // localStorage/sessionStorage from a file:// origin. Never let that crash the app.
+    const safeStore = (s) => ({
+      get: (k) => { try { return s.getItem(k); } catch (e) { return null; } },
+      set: (k, v) => { try { s.setItem(k, v); } catch (e) {} },
+      remove: (k) => { try { s.removeItem(k); } catch (e) {} },
+    });
+    const LS = safeStore(typeof localStorage !== 'undefined' ? localStorage : null);
+    const SS = safeStore(typeof sessionStorage !== 'undefined' ? sessionStorage : null);
+    const loadState = () => {
+      try {
+        const raw = LS.get(LS_KEY);
+        if (raw) return JSON.parse(raw);
+      } catch (e) {}
+      return { events: seedEvents, teams: seedTeams, venues: seedVenues };
+    };
+    const Store = createContext(null);
+    const useStore = () => useContext(Store);
+
+    /* ============================================================
+       UTIL
+    ============================================================ */
+    const toMin = (t) => { if (!t) return null; const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+    const overlaps = (aS, aE, bS, bE) => {
+      const a1 = toMin(aS), a2 = toMin(aE) ?? (toMin(aS) + 60);
+      const b1 = toMin(bS), b2 = toMin(bE) ?? (toMin(bS) + 60);
+      if (a1 == null || b1 == null) return false;
+      return a1 < b2 && b1 < a2;
+    };
+    const fmtDate = (iso, opts) => {
+      if (!iso) return '';
+      // Date-only strings are interpreted as UTC so the displayed day never shifts by timezone.
+      const dt = iso.length === 10 ? new Date(iso + 'T00:00:00Z') : new Date(iso);
+      const base = iso.length === 10 ? { timeZone: 'UTC' } : {};
+      return dt.toLocaleDateString('en-GB', { ...(opts || { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }), ...base });
+    };
+    // String-based (UTC) date arithmetic — avoids local-timezone drift in calendar math.
+    const isoAddDays = (iso, n) => { const x = new Date(iso + 'T00:00:00Z'); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
+    const isoStartOfWeek = (iso) => { const x = new Date(iso + 'T00:00:00Z'); const day = (x.getUTCDay() + 6) % 7; x.setUTCDate(x.getUTCDate() - day); return x.toISOString().slice(0, 10); };
+    const isoDayOfMonth = (iso) => new Date(iso + 'T00:00:00Z').getUTCDate();
+    const fmtDateShort = (iso) => fmtDate(iso, { weekday: 'short', day: 'numeric', month: 'short' });
+    const fmtTimeAgo = (iso) => {
+      const now = new Date('2026-06-08T12:00:00').getTime();
+      const then = new Date(iso).getTime();
+      const diff = Math.max(0, now - then);
+      const mins = Math.round(diff / 60000);
+      if (mins < 1) return 'just now';
+      if (mins < 60) return mins + 'm ago';
+      const hrs = Math.round(mins / 60);
+      if (hrs < 24) return hrs + 'h ago';
+      const days = Math.round(hrs / 24);
+      return days + (days === 1 ? ' day ago' : ' days ago');
+    };
+    const fmtStamp = (iso) => new Date(iso).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+    const todayISO = () => '2026-06-08';
+    const cls = (...a) => a.filter(Boolean).join(' ');
+
+    // Diff two event versions into human-readable log lines
+    const diffEvents = (prev, next, ctx) => {
+      const lines = [];
+      const venueName = (id) => (ctx.venues.find(v => v.id === id) || {}).name || '—';
+      const teamName = (id) => (ctx.teams.find(t => t.id === id) || {}).name || '—';
+      if (prev.venueId !== next.venueId) lines.push(`Venue changed from ${venueName(prev.venueId)} to ${venueName(next.venueId)}`);
+      if (prev.date !== next.date) lines.push(`Date moved from ${fmtDate(prev.date)} to ${fmtDate(next.date)}`);
+      if (prev.startTime !== next.startTime) lines.push(`Start time updated to ${next.startTime || '—'}`);
+      if (prev.endTime !== next.endTime) lines.push(`End time updated to ${next.endTime || '—'}`);
+      if (prev.status !== next.status) lines.push(`Event marked as ${next.status.toLowerCase()}`);
+      if (prev.teamId !== next.teamId) lines.push(`Team changed to ${teamName(next.teamId)}`);
+      if (prev.opponent !== next.opponent) lines.push(`Opponent updated to ${next.opponent || '—'}`);
+      if (prev.arrivalTime !== next.arrivalTime) lines.push(`Required arrival time updated to ${next.arrivalTime || '—'}`);
+      if (prev.transport !== next.transport) lines.push('Transport details updated');
+      if (prev.title !== next.title) lines.push('Event title updated');
+      if (prev.visibility !== next.visibility) lines.push(`Visibility set to ${next.visibility}`);
+      if (prev.notes !== next.notes) lines.push('Participant notes updated');
+      if (prev.locationNotes !== next.locationNotes) lines.push('Location notes updated');
+      if (lines.length === 0) lines.push('Event details updated');
+      return lines;
+    };
+
+    /* ============================================================
+       ROUTER (hash based)
+    ============================================================ */
+    const useRoute = () => {
+      const [hash, setHash] = useState(window.location.hash || '#/');
+      useEffect(() => {
+        const on = () => { setHash(window.location.hash || '#/'); window.scrollTo(0, 0); };
+        window.addEventListener('hashchange', on);
+        return () => window.removeEventListener('hashchange', on);
+      }, []);
+      return hash.replace(/^#/, '') || '/';
+    };
+    const nav = (path) => { window.location.hash = path; };
+    const Link = ({ to, children, className, onClick }) => (
+      <a href={'#' + to} className={className} onClick={onClick}>{children}</a>
+    );
+
+    /* ============================================================
+       TOAST
+    ============================================================ */
+    const ToastCtx = createContext(() => {});
+    const useToast = () => useContext(ToastCtx);
+    const ToastHost = ({ children }) => {
+      const [toasts, setToasts] = useState([]);
+      const push = useCallback((msg, kind = 'success') => {
+        const id = Math.random().toString(36).slice(2);
+        setToasts(t => [...t, { id, msg, kind }]);
+        setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 3200);
+      }, []);
+      return (
+        <ToastCtx.Provider value={push}>
+          {children}
+          <div className="fixed z-[60] bottom-4 right-4 left-4 sm:left-auto flex flex-col gap-2 items-end pointer-events-none">
+            {toasts.map(t => (
+              <div key={t.id} className={cls(
+                'toast-in pointer-events-auto max-w-sm w-full sm:w-auto rounded-xl px-4 py-3 shadow-cardhover text-sm font-medium flex items-center gap-2 text-white',
+                t.kind === 'error' ? 'bg-rose-600' : t.kind === 'info' ? 'bg-navy-800' : 'bg-emerald-600'
+              )}>
+                <span>{t.kind === 'error' ? '⚠️' : t.kind === 'info' ? 'ℹ️' : '✓'}</span>
+                <span>{t.msg}</span>
+              </div>
+            ))}
+          </div>
+        </ToastCtx.Provider>
+      );
+    };
+
+    /* ============================================================
+       SMALL UI PRIMITIVES
+    ============================================================ */
+    const Badge = ({ status }) => {
+      const s = STATUS_STYLES[status] || STATUS_STYLES.Draft;
+      return (
+        <span className={cls('inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold', s.badge)}>
+          <span className={cls('h-1.5 w-1.5 rounded-full', s.dot)}></span>{status}
+        </span>
+      );
+    };
+    const Btn = ({ variant = 'primary', size = 'md', className, ...p }) => {
+      const base = 'inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition-all focus:outline-none focus:ring-2 focus:ring-accent-400/50 disabled:opacity-50 disabled:pointer-events-none';
+      const sizes = { sm: 'px-3 py-1.5 text-sm', md: 'px-4 py-2.5 text-sm', lg: 'px-6 py-3 text-base' };
+      const variants = {
+        primary: 'bg-accent-600 text-white hover:bg-accent-700 shadow-sm hover:shadow',
+        navy: 'bg-navy-900 text-white hover:bg-navy-800 shadow-sm',
+        outline: 'bg-white text-navy-900 ring-1 ring-slate-200 hover:bg-slate-50',
+        ghost: 'text-navy-700 hover:bg-slate-100',
+        danger: 'bg-white text-rose-600 ring-1 ring-rose-200 hover:bg-rose-50',
+        soft: 'bg-accent-50 text-accent-700 hover:bg-accent-100',
+      };
+      return <button className={cls(base, sizes[size], variants[variant], className)} {...p} />;
+    };
+    const Card = ({ className, children, ...p }) => (
+      <div className={cls('bg-white rounded-2xl shadow-card', className)} {...p}>{children}</div>
+    );
+    const Field = ({ label, required, children, hint, className }) => (
+      <label className={cls('block', className)}>
+        <span className="text-sm font-semibold text-navy-900">{label}{required && <span className="text-rose-500"> *</span>}</span>
+        {hint && <span className="block text-xs text-slate-500 mb-1">{hint}</span>}
+        <div className="mt-1">{children}</div>
+      </label>
+    );
+    const inputCls = 'w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-navy-900 placeholder-slate-400 focus:border-accent-400 focus:ring-2 focus:ring-accent-100 outline-none transition';
+    const Input = (p) => <input {...p} className={cls(inputCls, p.className)} />;
+    const Select = ({ children, ...p }) => <select {...p} className={cls(inputCls, 'appearance-none bg-[length:1.1em] bg-no-repeat bg-[right_0.7rem_center] pr-9', p.className)} style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E\")" }}>{children}</select>;
+    const Textarea = (p) => <textarea {...p} className={cls(inputCls, 'min-h-[80px] resize-y', p.className)} />;
+
+    const Modal = ({ open, onClose, children, title, wide }) => {
+      if (!open) return null;
+      return (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="absolute inset-0 bg-navy-950/50 backdrop-blur-sm" onClick={onClose}></div>
+          <div className={cls('relative bg-white w-full rounded-t-3xl sm:rounded-2xl shadow-cardhover fade-in max-h-[92vh] overflow-y-auto', wide ? 'sm:max-w-2xl' : 'sm:max-w-md')}>
+            {title && (
+              <div className="sticky top-0 bg-white/95 backdrop-blur px-5 py-4 border-b border-slate-100 flex items-center justify-between z-10">
+                <h3 className="font-bold text-navy-900 text-lg">{title}</h3>
+                <button onClick={onClose} className="h-8 w-8 rounded-lg hover:bg-slate-100 text-slate-500 text-xl leading-none">×</button>
+              </div>
+            )}
+            <div className="p-5">{children}</div>
+          </div>
+        </div>
+      );
+    };
+
+    const Logo = ({ light, size = 'md' }) => {
+      const dim = size === 'lg' ? 'h-10 w-10 text-xl' : 'h-9 w-9 text-lg';
+      return (
+        <div className="flex items-center gap-2.5">
+          <div className={cls('rounded-xl bg-gradient-to-br from-accent-500 to-accent-700 grid place-items-center text-white font-extrabold shadow-sm', dim)}>S</div>
+          <div className="leading-none">
+            <div className={cls('font-extrabold tracking-tight', size === 'lg' ? 'text-xl' : 'text-lg', light ? 'text-white' : 'text-navy-900')}>Score<span className="text-accent-500">Sync</span></div>
+          </div>
+        </div>
+      );
+    };
+
+    const EmptyState = ({ icon, title, sub, action }) => (
+      <div className="text-center py-16 px-6">
+        <div className="text-5xl mb-3">{icon}</div>
+        <p className="font-semibold text-navy-900">{title}</p>
+        {sub && <p className="text-sm text-slate-500 mt-1 max-w-sm mx-auto">{sub}</p>}
+        {action && <div className="mt-4 flex justify-center">{action}</div>}
+      </div>
+    );
+
+    const Stat = ({ label, value, icon, tone = 'navy', sub }) => {
+      const tones = {
+        navy: 'from-navy-800 to-navy-900 text-white',
+        blue: 'from-accent-500 to-accent-700 text-white',
+        amber: 'bg-white ring-1 ring-amber-200',
+        rose: 'bg-white ring-1 ring-rose-200',
+        white: 'bg-white ring-1 ring-slate-100',
+      };
+      const dark = tone === 'navy' || tone === 'blue';
+      return (
+        <Card className={cls('p-5 bg-gradient-to-br', tones[tone])}>
+          <div className="flex items-start justify-between">
+            <div>
+              <p className={cls('text-3xl font-extrabold', dark ? 'text-white' : 'text-navy-900')}>{value}</p>
+              <p className={cls('text-sm mt-1 font-medium', dark ? 'text-white/70' : 'text-slate-500')}>{label}</p>
+            </div>
+            <div className={cls('text-2xl', dark ? '' : 'opacity-80')}>{icon}</div>
+          </div>
+          {sub && <p className={cls('text-xs mt-2', dark ? 'text-white/60' : 'text-slate-400')}>{sub}</p>}
+        </Card>
+      );
+    };
+
+    /* ============================================================
+       CONFLICT DETECTION
+    ============================================================ */
+    const findConflicts = (ev, allEvents) => {
+      const out = { venue: [], team: [] };
+      allEvents.forEach(o => {
+        if (o.id === ev.id) return;
+        if (o.status === 'Cancelled') return;
+        if (o.date !== ev.date) return;
+        if (!overlaps(ev.startTime, ev.endTime, o.startTime, o.endTime)) return;
+        if (ev.venueId && o.venueId === ev.venueId) out.venue.push(o);
+        if (ev.teamId && o.teamId === ev.teamId) out.team.push(o);
+      });
+      return out;
+    };
+
+    /* ============================================================
+       PUBLIC SITE CHROME
+    ============================================================ */
+    const PublicNav = () => {
+      const route = useRoute();
+      const items = [['/schedule', 'Schedule'], ['/sports', 'Sports'], ['/venues-public', 'Venues']];
+      return (
+        <header className="sticky top-0 z-40 bg-navy-900/95 backdrop-blur border-b border-white/5">
+          <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+            <Link to="/"><Logo light /></Link>
+            <nav className="hidden sm:flex items-center gap-1">
+              {items.map(([to, label]) => (
+                <Link key={to} to={to} className={cls('px-3.5 py-2 rounded-lg text-sm font-medium transition', route === to ? 'bg-white/10 text-white' : 'text-white/70 hover:text-white hover:bg-white/5')}>{label}</Link>
+              ))}
+              <Link to="/login" className="ml-2"><Btn size="sm" variant="primary">Admin Login</Btn></Link>
+            </nav>
+            <Link to="/login" className="sm:hidden"><Btn size="sm" variant="primary">Admin</Btn></Link>
+          </div>
+          <nav className="sm:hidden flex items-center gap-1 px-3 pb-2 -mt-1 overflow-x-auto">
+            {items.map(([to, label]) => (
+              <Link key={to} to={to} className={cls('px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap', route === to ? 'bg-white/10 text-white' : 'text-white/60')}>{label}</Link>
+            ))}
+          </nav>
+        </header>
+      );
+    };
+
+    const Footer = () => (
+      <footer className="bg-navy-950 text-white/60 mt-16">
+        <div className="max-w-6xl mx-auto px-4 py-10">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+            <div>
+              <Logo light />
+              <p className="text-sm mt-3 max-w-xs">Simplifying university sport coordination.</p>
+            </div>
+            <div className="flex gap-10 text-sm">
+              <div className="flex flex-col gap-2">
+                <span className="text-white/40 font-semibold uppercase text-xs tracking-wide">View</span>
+                <Link to="/schedule" className="hover:text-white">Schedule</Link>
+                <Link to="/sports" className="hover:text-white">Sports</Link>
+                <Link to="/venues-public" className="hover:text-white">Venues</Link>
+              </div>
+              <div className="flex flex-col gap-2">
+                <span className="text-white/40 font-semibold uppercase text-xs tracking-wide">Admin</span>
+                <Link to="/login" className="hover:text-white">Admin Login</Link>
+                <Link to="/admin" className="hover:text-white">Dashboard</Link>
+              </div>
+            </div>
+          </div>
+          <div className="border-t border-white/10 mt-8 pt-6 flex flex-col sm:flex-row justify-between gap-2 text-xs">
+            <span>🏴 Built for UK university sport</span>
+            <span>© 2026 ScoreSync · Dissertation MVP demo</span>
+          </div>
+        </div>
+      </footer>
+    );
+
+    /* ============================================================
+       LANDING PAGE
+    ============================================================ */
+    const Landing = () => {
+      const problems = [
+        { icon: '💬', t: 'Scattered communication', d: 'Fixtures live across WhatsApp, email, group chats and notice boards.' },
+        { icon: '❓', t: 'Unclear schedules', d: 'Athletes unsure when and where to turn up, or what to bring.' },
+        { icon: '⚠️', t: 'Venue clashes', d: 'Two teams double-booked on the same pitch or court.' },
+        { icon: '🔁', t: 'Last-minute changes', d: 'Postponements and venue swaps that never reach everyone.' },
+      ];
+      const solutions = [
+        { icon: '🗂️', t: 'Centralised schedule', d: 'One source of truth for every fixture, training and event.' },
+        { icon: '🛡️', t: 'Admin control', d: 'Coordinators create, edit and publish with full oversight.' },
+        { icon: '⚡', t: 'Instant updates', d: 'Changes appear immediately on the public schedule.' },
+        { icon: '👀', t: 'Easy visibility', d: 'Athletes, staff and supporters see what’s happening — no login needed.' },
+      ];
+      const features = [
+        { icon: '📅', t: 'Create fixtures & events', d: 'Fixtures, training, trials, tournaments, meetings and socials in one place.' },
+        { icon: '🏟️', t: 'Manage venues & teams', d: 'Keep teams, captains and venues organised and reusable.' },
+        { icon: '📢', t: 'Publish changes instantly', d: 'Postpone, cancel or move an event and everyone sees it at once.' },
+        { icon: '✅', t: 'Clear view for participants', d: 'A clean, mobile-friendly schedule for everyone involved.' },
+      ];
+      return (
+        <div>
+          <PublicNav />
+          {/* HERO */}
+          <section className="relative overflow-hidden bg-navy-900 text-white">
+            <div className="absolute inset-0 opacity-30" style={{ background: 'radial-gradient(60% 60% at 80% 0%, #2563eb55, transparent), radial-gradient(50% 50% at 0% 100%, #1d4ed833, transparent)' }}></div>
+            <div className="relative max-w-6xl mx-auto px-4 pt-16 pb-20 sm:pt-24 sm:pb-28">
+              <div className="max-w-3xl">
+                <span className="inline-flex items-center gap-2 rounded-full bg-white/10 ring-1 ring-white/15 px-3 py-1 text-xs font-medium text-white/80 mb-6">🏆 Built for UK university sport</span>
+                <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight leading-[1.05]">
+                  Coordinate university sport <span className="text-accent-400">without the spreadsheet chaos.</span>
+                </h1>
+                <p className="mt-6 text-lg sm:text-xl text-white/70 max-w-2xl">
+                  ScoreSync helps university sports teams schedule fixtures, manage events, and keep everyone updated in one simple place.
+                </p>
+                <div className="mt-8 flex flex-col sm:flex-row gap-3">
+                  <Link to="/schedule"><Btn size="lg" variant="primary" className="w-full sm:w-auto">📅 View Schedule</Btn></Link>
+                  <Link to="/login"><Btn size="lg" variant="outline" className="w-full sm:w-auto bg-white/10 text-white ring-white/20 hover:bg-white/15">🔑 Admin Login</Btn></Link>
+                </div>
+                <div className="mt-10 flex flex-wrap gap-x-8 gap-y-2 text-sm text-white/60">
+                  <span>✓ No account needed to view</span>
+                  <span>✓ Mobile-first</span>
+                  <span>✓ Real-time changes</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* PROBLEM */}
+          <section className="max-w-6xl mx-auto px-4 py-16 sm:py-20">
+            <div className="text-center max-w-2xl mx-auto">
+              <p className="text-accent-600 font-semibold text-sm uppercase tracking-wide">The problem</p>
+              <h2 className="text-3xl sm:text-4xl font-extrabold text-navy-900 mt-2">University sport runs on scattered tools</h2>
+              <p className="text-slate-500 mt-3">Spreadsheets, WhatsApp, email and paper schedules create confusion, clashes and a heavy admin burden.</p>
+            </div>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-10">
+              {problems.map(p => (
+                <Card key={p.t} className="p-5 hover:shadow-cardhover transition">
+                  <div className="text-3xl">{p.icon}</div>
+                  <h3 className="font-bold text-navy-900 mt-3">{p.t}</h3>
+                  <p className="text-sm text-slate-500 mt-1">{p.d}</p>
+                </Card>
+              ))}
+            </div>
+          </section>
+
+          {/* SOLUTION */}
+          <section className="bg-white border-y border-slate-100">
+            <div className="max-w-6xl mx-auto px-4 py-16 sm:py-20">
+              <div className="text-center max-w-2xl mx-auto">
+                <p className="text-accent-600 font-semibold text-sm uppercase tracking-wide">The solution</p>
+                <h2 className="text-3xl sm:text-4xl font-extrabold text-navy-900 mt-2">One centralised platform, total clarity</h2>
+                <p className="text-slate-500 mt-3">ScoreSync brings coordination, control and visibility together so nothing falls through the cracks.</p>
+              </div>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-10">
+                {solutions.map(s => (
+                  <div key={s.t} className="rounded-2xl bg-navy-50 p-5 ring-1 ring-navy-100">
+                    <div className="text-3xl">{s.icon}</div>
+                    <h3 className="font-bold text-navy-900 mt-3">{s.t}</h3>
+                    <p className="text-sm text-slate-600 mt-1">{s.d}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          {/* FEATURES */}
+          <section className="max-w-6xl mx-auto px-4 py-16 sm:py-20">
+            <div className="text-center max-w-2xl mx-auto">
+              <p className="text-accent-600 font-semibold text-sm uppercase tracking-wide">What you can do</p>
+              <h2 className="text-3xl sm:text-4xl font-extrabold text-navy-900 mt-2">Everything you need to coordinate</h2>
+            </div>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-10">
+              {features.map((f, i) => (
+                <Card key={f.t} className="p-6 hover:shadow-cardhover transition">
+                  <div className="h-11 w-11 rounded-xl bg-accent-50 grid place-items-center text-2xl">{f.icon}</div>
+                  <div className="text-xs font-bold text-accent-600 mt-4">0{i + 1}</div>
+                  <h3 className="font-bold text-navy-900 mt-1">{f.t}</h3>
+                  <p className="text-sm text-slate-500 mt-1">{f.d}</p>
+                </Card>
+              ))}
+            </div>
+          </section>
+
+          {/* CTA */}
+          <section className="max-w-6xl mx-auto px-4 pb-8">
+            <div className="rounded-3xl bg-gradient-to-br from-navy-800 to-navy-950 px-6 py-12 sm:p-14 text-center text-white relative overflow-hidden">
+              <div className="absolute inset-0 opacity-40" style={{ background: 'radial-gradient(40% 80% at 100% 0%, #2563eb44, transparent)' }}></div>
+              <div className="relative">
+                <h2 className="text-3xl sm:text-4xl font-extrabold">Ready to see it in action?</h2>
+                <p className="text-white/70 mt-3 max-w-xl mx-auto">Explore the live public schedule, or sign in as a demo admin to create and manage events.</p>
+                <div className="mt-7 flex flex-col sm:flex-row gap-3 justify-center">
+                  <Link to="/schedule"><Btn size="lg" variant="primary" className="w-full sm:w-auto">View Schedule</Btn></Link>
+                  <Link to="/login"><Btn size="lg" variant="outline" className="w-full sm:w-auto bg-white/10 text-white ring-white/20 hover:bg-white/15">Admin Login</Btn></Link>
+                </div>
+              </div>
+            </div>
+          </section>
+          <Footer />
+        </div>
+      );
+    };
+
+    /* ============================================================
+       ADMIN LOGIN
+    ============================================================ */
+    const Login = ({ onLogin }) => {
+      const [email, setEmail] = useState('');
+      const [pw, setPw] = useState('');
+      const toast = useToast();
+      const submit = (e) => {
+        e.preventDefault();
+        if (!email || !pw) { toast('Enter email and password (or use demo)', 'error'); return; }
+        onLogin(email.split('@')[0] || 'Admin');
+        toast('Signed in', 'success');
+        nav('/admin');
+      };
+      const demo = () => { onLogin('Demo Admin'); toast('Signed in as Demo Admin', 'success'); nav('/admin'); };
+      return (
+        <div className="min-h-screen bg-navy-900 flex flex-col">
+          <div className="p-4">
+            <Link to="/" className="inline-flex"><Logo light /></Link>
+          </div>
+          <div className="flex-1 grid place-items-center px-4 py-8">
+            <div className="w-full max-w-md fade-in">
+              <Card className="p-7">
+                <h1 className="text-2xl font-extrabold text-navy-900">Admin sign in</h1>
+                <p className="text-sm text-slate-500 mt-1">Sign in to manage fixtures, teams and venues.</p>
+                <form onSubmit={submit} className="mt-6 space-y-4">
+                  <Field label="Email">
+                    <Input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@uni.ac.uk" autoComplete="username" />
+                  </Field>
+                  <Field label="Password">
+                    <Input type="password" value={pw} onChange={e => setPw(e.target.value)} placeholder="••••••••" autoComplete="current-password" />
+                  </Field>
+                  <Btn type="submit" size="lg" className="w-full">Login</Btn>
+                </form>
+                <div className="relative my-5 text-center">
+                  <span className="bg-white px-3 text-xs text-slate-400 relative z-10">or</span>
+                  <div className="absolute inset-x-0 top-1/2 h-px bg-slate-100"></div>
+                </div>
+                <Btn variant="navy" size="lg" className="w-full" onClick={demo}>👤 Continue as Demo Admin</Btn>
+                <p className="text-xs text-slate-400 text-center mt-4">Demo only — authentication is mocked for this MVP.</p>
+              </Card>
+              <p className="text-center text-white/50 text-sm mt-5">
+                <Link to="/schedule" className="hover:text-white underline underline-offset-2">View the public schedule instead →</Link>
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    /* ============================================================
+       ADMIN CHROME (sidebar / topbar)
+    ============================================================ */
+    const ADMIN_NAV = [
+      ['/admin', 'Dashboard', '📊'],
+      ['/admin/schedule', 'Schedule', '📅'],
+      ['/admin/event/new', 'Create Event', '➕'],
+      ['/admin/teams', 'Teams', '👥'],
+      ['/admin/venues', 'Venues', '🏟️'],
+    ];
+    const AdminShell = ({ children, user, onLogout, route }) => {
+      const [open, setOpen] = useState(false);
+      const isActive = (to) => to === '/admin' ? route === '/admin' : route.startsWith(to);
+      const NavLinks = ({ onClick }) => (
+        <>
+          {ADMIN_NAV.map(([to, label, icon]) => (
+            <Link key={to} to={to} onClick={onClick} className={cls('flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition', isActive(to) ? 'bg-accent-600 text-white shadow-sm' : 'text-white/70 hover:text-white hover:bg-white/10')}>
+              <span className="text-base">{icon}</span>{label}
+            </Link>
+          ))}
+          <div className="h-px bg-white/10 my-2"></div>
+          <Link to="/schedule" onClick={onClick} className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-white/70 hover:text-white hover:bg-white/10">
+            <span className="text-base">🔗</span>Public View
+          </Link>
+        </>
+      );
+      return (
+        <div className="min-h-screen bg-navy-50 flex">
+          {/* Sidebar desktop */}
+          <aside className="hidden lg:flex flex-col w-64 bg-navy-900 fixed inset-y-0">
+            <div className="p-5"><Link to="/admin"><Logo light /></Link></div>
+            <nav className="flex-1 px-3 space-y-1">{NavLinks({})}</nav>
+            <div className="p-3 border-t border-white/10">
+              <div className="flex items-center gap-3 px-2 py-2">
+                <div className="h-9 w-9 rounded-full bg-accent-600 grid place-items-center text-white font-bold text-sm">{(user || 'A')[0].toUpperCase()}</div>
+                <div className="min-w-0">
+                  <p className="text-white text-sm font-semibold truncate">{user}</p>
+                  <p className="text-white/40 text-xs">Administrator</p>
+                </div>
+              </div>
+              <Btn variant="ghost" size="sm" className="w-full text-white/70 hover:bg-white/10 mt-1" onClick={onLogout}>Sign out</Btn>
+            </div>
+          </aside>
+
+          {/* Mobile topbar */}
+          <div className="lg:hidden fixed top-0 inset-x-0 z-40 bg-navy-900 h-14 flex items-center justify-between px-4">
+            <Link to="/admin"><Logo light /></Link>
+            <button onClick={() => setOpen(true)} className="text-white text-2xl h-10 w-10 grid place-items-center rounded-lg hover:bg-white/10">☰</button>
+          </div>
+          {open && (
+            <div className="lg:hidden fixed inset-0 z-50">
+              <div className="absolute inset-0 bg-navy-950/60" onClick={() => setOpen(false)}></div>
+              <div className="absolute left-0 inset-y-0 w-72 bg-navy-900 p-3 flex flex-col fade-in">
+                <div className="flex items-center justify-between p-2">
+                  <Logo light />
+                  <button onClick={() => setOpen(false)} className="text-white/70 text-2xl h-9 w-9">×</button>
+                </div>
+                <nav className="flex-1 space-y-1 mt-2">{NavLinks({ onClick: () => setOpen(false) })}</nav>
+                <Btn variant="ghost" size="sm" className="text-white/70 hover:bg-white/10" onClick={onLogout}>Sign out ({user})</Btn>
+              </div>
+            </div>
+          )}
+
+          <main className="flex-1 lg:ml-64 pt-14 lg:pt-0 min-w-0">{children}</main>
+        </div>
+      );
+    };
+
+    const PageHeader = ({ title, sub, actions }) => (
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+        <div>
+          <h1 className="text-2xl font-extrabold text-navy-900">{title}</h1>
+          {sub && <p className="text-slate-500 text-sm mt-0.5">{sub}</p>}
+        </div>
+        {actions && <div className="flex gap-2 flex-wrap">{actions}</div>}
+      </div>
+    );
+
+    /* ============================================================
+       ADMIN DASHBOARD
+    ============================================================ */
+    const Dashboard = () => {
+      const { events, teams, venues } = useStore();
+      const venueName = (id) => (venues.find(v => v.id === id) || {}).name || '—';
+      const teamName = (id) => (teams.find(t => t.id === id) || {}).name || '—';
+
+      const upcoming = useMemo(() => events
+        .filter(e => e.date >= todayISO() && e.status !== 'Cancelled' && e.status !== 'Completed')
+        .sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime)), [events]);
+
+      const weekEnd = isoAddDays(todayISO(), 7);
+      const thisWeek = upcoming.filter(e => e.date <= weekEnd);
+
+      const drafts = events.filter(e => e.status === 'Draft');
+
+      const conflictCount = useMemo(() => {
+        const seen = new Set(); let n = 0;
+        events.forEach(e => {
+          const c = findConflicts(e, events);
+          [...c.venue, ...c.team].forEach(o => {
+            const key = [e.id, o.id].sort().join('-');
+            if (!seen.has(key)) { seen.add(key); n++; }
+          });
+        });
+        return n;
+      }, [events]);
+
+      return (
+        <div className="p-4 sm:p-8 max-w-6xl mx-auto fade-in">
+          <PageHeader
+            title="Dashboard"
+            sub="Overview of upcoming university sport activity."
+            actions={<>
+              <Link to="/admin/event/new"><Btn>➕ Create New Event</Btn></Link>
+              <Link to="/schedule"><Btn variant="outline">🔗 Public Schedule</Btn></Link>
+            </>}
+          />
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <Stat tone="navy" label="Upcoming events" value={upcoming.length} icon="📅" sub="Published & draft, not yet played" />
+            <Stat tone="blue" label="Events this week" value={thisWeek.length} icon="🗓️" sub="Next 7 days" />
+            <Stat tone={conflictCount ? 'rose' : 'white'} label="Venue/time conflicts" value={conflictCount} icon={conflictCount ? '⚠️' : '✅'} sub={conflictCount ? 'Overlapping bookings' : 'No clashes detected'} />
+            <Stat tone={drafts.length ? 'amber' : 'white'} label="Draft / unpublished" value={drafts.length} icon="📝" sub="Not yet visible publicly" />
+          </div>
+
+          <div className="grid lg:grid-cols-3 gap-5 mt-6">
+            <Card className="lg:col-span-2 overflow-hidden">
+              <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+                <h2 className="font-bold text-navy-900">Upcoming events</h2>
+                <Link to="/admin/schedule" className="text-sm font-semibold text-accent-600 hover:text-accent-700">View all →</Link>
+              </div>
+              {upcoming.length === 0 ? (
+                <EmptyState icon="📭" title="No upcoming events" sub="Create your first event to get started." action={<Link to="/admin/event/new"><Btn size="sm">Create Event</Btn></Link>} />
+              ) : (
+                <ul className="divide-y divide-slate-50">
+                  {upcoming.slice(0, 6).map(e => (
+                    <li key={e.id}>
+                      <Link to={'/admin/event/' + e.id} className="flex items-center gap-3 px-5 py-3.5 hover:bg-slate-50 transition">
+                        <div className="h-11 w-11 shrink-0 rounded-xl bg-navy-50 grid place-items-center text-xl">{SPORT_EMOJI[e.sport]}</div>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-semibold text-navy-900 truncate">{e.title}</p>
+                          <p className="text-xs text-slate-500 truncate">{fmtDateShort(e.date)} · {e.startTime} · {venueName(e.venueId)}</p>
+                        </div>
+                        <Badge status={e.status} />
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+
+            <div className="space-y-5">
+              <Card className="p-5">
+                <h2 className="font-bold text-navy-900 mb-3">Quick actions</h2>
+                <div className="space-y-2">
+                  <Link to="/admin/event/new" className="block"><Btn className="w-full justify-start" variant="soft">➕ Create New Event</Btn></Link>
+                  <Link to="/admin/teams" className="block"><Btn className="w-full justify-start" variant="outline">👥 Manage Teams</Btn></Link>
+                  <Link to="/admin/venues" className="block"><Btn className="w-full justify-start" variant="outline">🏟️ Manage Venues</Btn></Link>
+                  <Link to="/admin/schedule" className="block"><Btn className="w-full justify-start" variant="outline">📅 Admin Calendar</Btn></Link>
+                  <Link to="/schedule" className="block"><Btn className="w-full justify-start" variant="outline">🔗 View Public Schedule</Btn></Link>
+                </div>
+              </Card>
+              <Card className="p-5">
+                <h2 className="font-bold text-navy-900 mb-3">At a glance</h2>
+                <dl className="space-y-2 text-sm">
+                  <div className="flex justify-between"><dt className="text-slate-500">Teams</dt><dd className="font-semibold text-navy-900">{teams.length}</dd></div>
+                  <div className="flex justify-between"><dt className="text-slate-500">Venues</dt><dd className="font-semibold text-navy-900">{venues.length}</dd></div>
+                  <div className="flex justify-between"><dt className="text-slate-500">Total events</dt><dd className="font-semibold text-navy-900">{events.length}</dd></div>
+                  <div className="flex justify-between"><dt className="text-slate-500">Published</dt><dd className="font-semibold text-navy-900">{events.filter(e => e.status === 'Published').length}</dd></div>
+                </dl>
+              </Card>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    /* ============================================================
+       ADMIN SCHEDULE / CALENDAR
+    ============================================================ */
+    const FilterBar = ({ filters, setFilters, teams, venues, search, setSearch, extra }) => {
+      const set = (k, v) => setFilters(f => ({ ...f, [k]: v }));
+      return (
+        <Card className="p-4 mb-5">
+          <div className="flex flex-col lg:flex-row gap-3">
+            <div className="relative flex-1">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">🔍</span>
+              <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search events, teams, opponents…" className="pl-9" />
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:flex gap-2">
+              <Select value={filters.sport} onChange={e => set('sport', e.target.value)}><option value="">All sports</option>{SPORTS.map(s => <option key={s}>{s}</option>)}</Select>
+              <Select value={filters.team} onChange={e => set('team', e.target.value)}><option value="">All teams</option>{teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</Select>
+              <Select value={filters.venue} onChange={e => set('venue', e.target.value)}><option value="">All venues</option>{venues.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}</Select>
+              <Select value={filters.type} onChange={e => set('type', e.target.value)}><option value="">All types</option>{EVENT_TYPES.map(t => <option key={t}>{t}</option>)}</Select>
+              {extra}
+            </div>
+          </div>
+        </Card>
+      );
+    };
+
+    const applyFilters = (events, filters, search) => {
+      const q = search.trim().toLowerCase();
+      return events.filter(e => {
+        if (filters.sport && e.sport !== filters.sport) return false;
+        if (filters.team && e.teamId !== filters.team) return false;
+        if (filters.venue && e.venueId !== filters.venue) return false;
+        if (filters.type && e.type !== filters.type) return false;
+        if (filters.status && e.status !== filters.status) return false;
+        if (q) {
+          const hay = [e.title, e.opponent, e.sport, e.type].join(' ').toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        return true;
+      });
+    };
+
+    const AdminEventCard = ({ e, venueName, teamName, conflict }) => (
+      <Link to={'/admin/event/' + e.id} className="group block">
+        <div className="relative bg-white rounded-xl shadow-card hover:shadow-cardhover transition overflow-hidden ring-1 ring-slate-100">
+          <div className={cls('absolute left-0 inset-y-0 w-1.5', STATUS_STYLES[e.status].bar)}></div>
+          <div className="pl-4 pr-3 py-3">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+                  <span>{SPORT_EMOJI[e.sport]} {e.sport}</span><span>·</span><span>{e.type}</span>
+                </div>
+                <p className="font-semibold text-navy-900 truncate mt-0.5 group-hover:text-accent-700">{e.title}</p>
+              </div>
+              <Badge status={e.status} />
+            </div>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600 mt-2">
+              <span>🗓️ {fmtDateShort(e.date)}</span>
+              <span>⏰ {e.startTime}{e.endTime ? '–' + e.endTime : ''}</span>
+              <span>📍 {venueName(e.venueId)}</span>
+              <span>👥 {teamName(e.teamId)}</span>
+            </div>
+            {conflict && <div className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-rose-600 bg-rose-50 rounded-md px-2 py-0.5">⚠️ Scheduling conflict</div>}
+          </div>
+        </div>
+      </Link>
+    );
+
+    const AdminSchedule = () => {
+      const { events, teams, venues } = useStore();
+      const [view, setView] = useState('list');
+      const [filters, setFilters] = useState({ sport: '', team: '', venue: '', type: '', status: '' });
+      const [search, setSearch] = useState('');
+      const venueName = (id) => (venues.find(v => v.id === id) || {}).name || '—';
+      const teamName = (id) => (teams.find(t => t.id === id) || {}).name || '—';
+
+      const filtered = useMemo(() => applyFilters(events, filters, search)
+        .sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime)), [events, filters, search]);
+
+      const hasConflict = (e) => { const c = findConflicts(e, events); return c.venue.length + c.team.length > 0; };
+
+      return (
+        <div className="p-4 sm:p-8 max-w-6xl mx-auto fade-in">
+          <PageHeader title="Schedule" sub="All fixtures, training and events." actions={<Link to="/admin/event/new"><Btn>➕ Create Event</Btn></Link>} />
+
+          <div className="flex items-center gap-1 bg-white p-1 rounded-xl shadow-card w-fit mb-5">
+            {[['list', 'List', '☰'], ['week', 'Week', '▦'], ['month', 'Month', '🗓️']].map(([v, l, i]) => (
+              <button key={v} onClick={() => setView(v)} className={cls('px-4 py-2 rounded-lg text-sm font-semibold transition', view === v ? 'bg-navy-900 text-white' : 'text-slate-600 hover:bg-slate-100')}>
+                <span className="mr-1.5">{i}</span>{l}
+              </button>
+            ))}
+          </div>
+
+          <FilterBar filters={filters} setFilters={setFilters} teams={teams} venues={venues} search={search} setSearch={setSearch}
+            extra={<Select value={filters.status} onChange={e => setFilters(f => ({ ...f, status: e.target.value }))}><option value="">All statuses</option>{STATUSES.map(s => <option key={s}>{s}</option>)}</Select>} />
+
+          <p className="text-sm text-slate-500 mb-3">{filtered.length} event{filtered.length !== 1 ? 's' : ''}</p>
+
+          {filtered.length === 0 ? (
+            <Card><EmptyState icon="🔍" title="No events match" sub="Try adjusting your filters or search." /></Card>
+          ) : view === 'list' ? (
+            <ListView events={filtered} venueName={venueName} teamName={teamName} hasConflict={hasConflict} />
+          ) : view === 'week' ? (
+            <WeekView events={filtered} venueName={venueName} teamName={teamName} hasConflict={hasConflict} />
+          ) : (
+            <MonthView events={filtered} venueName={venueName} />
+          )}
+        </div>
+      );
+    };
+
+    const ListView = ({ events, venueName, teamName, hasConflict }) => {
+      const groups = useMemo(() => {
+        const g = {};
+        events.forEach(e => { (g[e.date] = g[e.date] || []).push(e); });
+        return Object.entries(g).sort((a, b) => a[0].localeCompare(b[0]));
+      }, [events]);
+      return (
+        <div className="space-y-6">
+          {groups.map(([date, evs]) => (
+            <div key={date}>
+              <div className="flex items-center gap-3 mb-2">
+                <h3 className="font-bold text-navy-900">{fmtDate(date, { weekday: 'long', day: 'numeric', month: 'long' })}</h3>
+                {date === todayISO() && <span className="text-xs font-bold text-accent-600 bg-accent-50 px-2 py-0.5 rounded-full">TODAY</span>}
+                <div className="flex-1 h-px bg-slate-200"></div>
+              </div>
+              <div className="grid sm:grid-cols-2 gap-3">
+                {evs.map(e => <AdminEventCard key={e.id} e={e} venueName={venueName} teamName={teamName} conflict={hasConflict(e)} />)}
+              </div>
+            </div>
+          ))}
+        </div>
+      );
+    };
+
+    const WeekView = ({ events, venueName, teamName, hasConflict }) => {
+      const [anchor, setAnchor] = useState(todayISO());
+      const week = useMemo(() => {
+        const s = isoStartOfWeek(anchor);
+        return Array.from({ length: 7 }, (_, i) => isoAddDays(s, i));
+      }, [anchor]);
+      const shift = (n) => setAnchor(isoAddDays(anchor, n * 7));
+      const byDay = (iso) => events.filter(e => e.date === iso).sort((a, b) => a.startTime.localeCompare(b.startTime));
+      return (
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex gap-2">
+              <Btn size="sm" variant="outline" onClick={() => shift(-1)}>← Prev</Btn>
+              <Btn size="sm" variant="outline" onClick={() => setAnchor(todayISO())}>Today</Btn>
+              <Btn size="sm" variant="outline" onClick={() => shift(1)}>Next →</Btn>
+            </div>
+            <p className="text-sm font-semibold text-navy-900">{fmtDate(week[0], { day: 'numeric', month: 'short' })} – {fmtDate(week[6], { day: 'numeric', month: 'short' })}</p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-2">
+            {week.map(iso => {
+              const evs = byDay(iso);
+              const isToday = iso === todayISO();
+              return (
+                <div key={iso} className={cls('rounded-xl p-2 min-h-[120px]', isToday ? 'bg-accent-50 ring-1 ring-accent-200' : 'bg-white shadow-card')}>
+                  <div className="text-xs font-bold text-navy-900 mb-2 flex items-center justify-between">
+                    <span>{fmtDate(iso, { weekday: 'short' })}</span>
+                    <span className={cls('h-6 w-6 grid place-items-center rounded-full', isToday ? 'bg-accent-600 text-white' : 'text-slate-500')}>{isoDayOfMonth(iso)}</span>
+                  </div>
+                  <div className="space-y-1.5">
+                    {evs.map(e => (
+                      <Link key={e.id} to={'/admin/event/' + e.id} className="block">
+                        <div className="rounded-lg p-1.5 text-xs bg-white ring-1 ring-slate-100 hover:ring-accent-300 hover:shadow-sm transition relative overflow-hidden">
+                          <div className={cls('absolute left-0 inset-y-0 w-1', STATUS_STYLES[e.status].bar)}></div>
+                          <div className="pl-1.5">
+                            <p className="font-semibold text-navy-900">{e.startTime}</p>
+                            <p className="text-slate-600 truncate">{SPORT_EMOJI[e.sport]} {e.title}</p>
+                          </div>
+                        </div>
+                      </Link>
+                    ))}
+                    {evs.length === 0 && <p className="text-[11px] text-slate-300 text-center py-2">—</p>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    };
+
+    const MonthView = ({ events, venueName }) => {
+      const [anchor, setAnchor] = useState(todayISO());
+      const cur = new Date(anchor + 'T00:00:00Z');
+      const year = cur.getUTCFullYear(), month = cur.getUTCMonth();
+      const first = new Date(Date.UTC(year, month, 1));
+      const startPad = (first.getUTCDay() + 6) % 7;
+      const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+      const cells = [];
+      for (let i = 0; i < startPad; i++) cells.push(null);
+      for (let day = 1; day <= daysInMonth; day++) cells.push(new Date(Date.UTC(year, month, day)).toISOString().slice(0, 10));
+      while (cells.length % 7 !== 0) cells.push(null);
+      const shift = (n) => setAnchor(new Date(Date.UTC(year, month + n, 1)).toISOString().slice(0, 10));
+      const byDay = (iso) => events.filter(e => e.date === iso).sort((a, b) => a.startTime.localeCompare(b.startTime));
+      return (
+        <Card className="p-3 sm:p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex gap-2">
+              <Btn size="sm" variant="outline" onClick={() => shift(-1)}>←</Btn>
+              <Btn size="sm" variant="outline" onClick={() => setAnchor(todayISO())}>Today</Btn>
+              <Btn size="sm" variant="outline" onClick={() => shift(1)}>→</Btn>
+            </div>
+            <p className="font-bold text-navy-900">{cur.toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' })}</p>
+          </div>
+          <div className="grid grid-cols-7 gap-1 text-center text-xs font-semibold text-slate-400 mb-1">
+            {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => <div key={d} className="py-1">{d}</div>)}
+          </div>
+          <div className="grid grid-cols-7 gap-1">
+            {cells.map((iso, i) => {
+              if (!iso) return <div key={i} className="min-h-[84px] rounded-lg bg-slate-50/50"></div>;
+              const evs = byDay(iso);
+              const isToday = iso === todayISO();
+              return (
+                <div key={i} className={cls('min-h-[84px] rounded-lg p-1 border', isToday ? 'border-accent-300 bg-accent-50' : 'border-slate-100')}>
+                  <div className={cls('text-xs font-semibold mb-0.5 px-1', isToday ? 'text-accent-700' : 'text-slate-500')}>{isoDayOfMonth(iso)}</div>
+                  <div className="space-y-0.5">
+                    {evs.slice(0, 3).map(e => (
+                      <Link key={e.id} to={'/admin/event/' + e.id} className="block">
+                        <div className="flex items-center gap-1 text-[10px] leading-tight px-1 py-0.5 rounded hover:bg-white">
+                          <span className={cls('h-1.5 w-1.5 rounded-full shrink-0', STATUS_STYLES[e.status].dot)}></span>
+                          <span className="truncate text-navy-800">{e.startTime} {e.sport}</span>
+                        </div>
+                      </Link>
+                    ))}
+                    {evs.length > 3 && <p className="text-[10px] text-slate-400 px-1">+{evs.length - 3} more</p>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      );
+    };
+
+    /* ============================================================
+       EVENT FORM (create / edit)
+    ============================================================ */
+    const EventForm = ({ id }) => {
+      const store = useStore();
+      const { events, teams, venues, saveEvent, deleteEvent } = store;
+      const toast = useToast();
+      const existing = id ? events.find(e => e.id === id) : null;
+      const isEdit = !!existing;
+
+      const blank = {
+        title: '', sport: '', teamId: '', opponent: '', type: 'Fixture', date: todayISO(),
+        startTime: '', endTime: '', venueId: '', locationNotes: '', homeAway: 'Home',
+        transport: '', arrivalTime: '', notes: '', status: 'Draft', visibility: 'Public',
+      };
+      const [form, setForm] = useState(existing ? { ...existing } : blank);
+      const [errors, setErrors] = useState({});
+      const [confirmDel, setConfirmDel] = useState(false);
+      const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+      // when team picked, auto-fill sport if empty
+      const onTeam = (tid) => {
+        const t = teams.find(x => x.id === tid);
+        setForm(f => ({ ...f, teamId: tid, sport: f.sport || (t ? t.sport : '') }));
+      };
+
+      const conflicts = useMemo(() => findConflicts(form, events), [form, events]);
+      const venueName = (vid) => (venues.find(v => v.id === vid) || {}).name || '—';
+
+      const validate = () => {
+        const e = {};
+        if (!form.title.trim()) e.title = 'Title is required';
+        if (!form.sport) e.sport = 'Sport is required';
+        if (!form.date) e.date = 'Date is required';
+        if (!form.startTime) e.startTime = 'Start time is required';
+        if (!form.venueId) e.venueId = 'Venue is required';
+        if (form.endTime && form.startTime && form.endTime <= form.startTime) e.endTime = 'End time must be after start time';
+        setErrors(e);
+        return Object.keys(e).length === 0;
+      };
+
+      const doSave = (statusOverride) => {
+        const next = statusOverride ? { ...form, status: statusOverride } : form;
+        if (!validate()) { toast('Please fix the highlighted fields', 'error'); return; }
+        saveEvent(next, isEdit);
+        toast(isEdit ? 'Event updated' : 'Event created', 'success');
+        nav(isEdit ? '/admin/event/' + existing.id : '/admin/schedule');
+      };
+
+      if (id && !existing) {
+        return <div className="p-8 max-w-3xl mx-auto"><Card className="p-8"><EmptyState icon="🤷" title="Event not found" action={<Link to="/admin/schedule"><Btn>Back to schedule</Btn></Link>} /></Card></div>;
+      }
+
+      const ErrText = ({ k }) => errors[k] ? <p className="text-xs text-rose-600 mt-1">{errors[k]}</p> : null;
+
+      return (
+        <div className="p-4 sm:p-8 max-w-3xl mx-auto fade-in">
+          <div className="mb-4"><Link to="/admin/schedule" className="text-sm font-semibold text-slate-500 hover:text-navy-900">← Back to schedule</Link></div>
+          <PageHeader title={isEdit ? 'Edit event' : 'Create new event'} sub={isEdit ? 'Update details — changes are logged automatically.' : 'Add a fixture, training session or other event.'} />
+
+          {/* Conflict warnings */}
+          {(conflicts.venue.length > 0 || conflicts.team.length > 0) && (
+            <div className="mb-5 rounded-2xl bg-amber-50 ring-1 ring-amber-200 p-4">
+              <p className="font-bold text-amber-800 flex items-center gap-2">⚠️ Possible scheduling conflict</p>
+              <ul className="mt-2 text-sm text-amber-800 space-y-1 list-disc pl-5">
+                {conflicts.venue.map(o => <li key={'v' + o.id}><strong>Venue clash:</strong> {venueName(form.venueId)} also booked for “{o.title}” at {o.startTime}{o.endTime ? '–' + o.endTime : ''}.</li>)}
+                {conflicts.team.map(o => <li key={'t' + o.id}><strong>Team clash:</strong> this team also has “{o.title}” at {o.startTime}{o.endTime ? '–' + o.endTime : ''}.</li>)}
+              </ul>
+              <p className="text-xs text-amber-700 mt-2">You can still save — this is a warning, not a block.</p>
+            </div>
+          )}
+
+          <div className="space-y-5">
+            <Card className="p-5 space-y-4">
+              <h3 className="font-bold text-navy-900">Details</h3>
+              <Field label="Event title" required>
+                <Input value={form.title} onChange={e => set('title', e.target.value)} placeholder="e.g. Men’s Football vs Northgate University" />
+                <ErrText k="title" />
+              </Field>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <Field label="Sport" required>
+                  <Select value={form.sport} onChange={e => set('sport', e.target.value)}><option value="">Select sport…</option>{SPORTS.map(s => <option key={s}>{s}</option>)}</Select>
+                  <ErrText k="sport" />
+                </Field>
+                <Field label="Event type" required>
+                  <Select value={form.type} onChange={e => set('type', e.target.value)}>{EVENT_TYPES.map(t => <option key={t}>{t}</option>)}</Select>
+                </Field>
+                <Field label="Team">
+                  <Select value={form.teamId} onChange={e => onTeam(e.target.value)}><option value="">Select team…</option>{teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</Select>
+                </Field>
+                <Field label="Opponent" hint="Leave blank for training/socials">
+                  <Input value={form.opponent} onChange={e => set('opponent', e.target.value)} placeholder="e.g. Northgate University" />
+                </Field>
+              </div>
+            </Card>
+
+            <Card className="p-5 space-y-4">
+              <h3 className="font-bold text-navy-900">When & where</h3>
+              <div className="grid sm:grid-cols-3 gap-4">
+                <Field label="Date" required><Input type="date" value={form.date} onChange={e => set('date', e.target.value)} /><ErrText k="date" /></Field>
+                <Field label="Start time" required><Input type="time" value={form.startTime} onChange={e => set('startTime', e.target.value)} /><ErrText k="startTime" /></Field>
+                <Field label="End time"><Input type="time" value={form.endTime} onChange={e => set('endTime', e.target.value)} /><ErrText k="endTime" /></Field>
+              </div>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <Field label="Venue" required>
+                  <Select value={form.venueId} onChange={e => set('venueId', e.target.value)}><option value="">Select venue…</option>{venues.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}</Select>
+                  <ErrText k="venueId" />
+                </Field>
+                <Field label="Home / Away / Neutral">
+                  <Select value={form.homeAway} onChange={e => set('homeAway', e.target.value)}>{HOME_AWAY.map(h => <option key={h}>{h}</option>)}</Select>
+                </Field>
+              </div>
+              <Field label="Location notes" hint="Gate, entrance, parking, off-campus directions…">
+                <Input value={form.locationNotes} onChange={e => set('locationNotes', e.target.value)} placeholder="e.g. Enter via North Playing Fields gate" />
+              </Field>
+            </Card>
+
+            <Card className="p-5 space-y-4">
+              <h3 className="font-bold text-navy-900">Participant info</h3>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <Field label="Required arrival time"><Input type="time" value={form.arrivalTime} onChange={e => set('arrivalTime', e.target.value)} /></Field>
+                <Field label="Transport details"><Input value={form.transport} onChange={e => set('transport', e.target.value)} placeholder="e.g. Minibus departs 11:45" /></Field>
+              </div>
+              <Field label="Notes for participants">
+                <Textarea value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Kit, warm-up time, what to bring…" />
+              </Field>
+            </Card>
+
+            <Card className="p-5 space-y-4">
+              <h3 className="font-bold text-navy-900">Status & visibility</h3>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <Field label="Status"><Select value={form.status} onChange={e => set('status', e.target.value)}>{STATUSES.map(s => <option key={s}>{s}</option>)}</Select></Field>
+                <Field label="Visibility" hint="Who can see this event"><Select value={form.visibility} onChange={e => set('visibility', e.target.value)}>{VISIBILITIES.map(v => <option key={v}>{v}</option>)}</Select></Field>
+              </div>
+            </Card>
+
+            {isEdit && existing.log && (
+              <Card className="p-5">
+                <h3 className="font-bold text-navy-900 mb-3">📋 Update log</h3>
+                <UpdateLog log={existing.log} />
+              </Card>
+            )}
+
+            <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between sticky bottom-0 bg-navy-50/80 backdrop-blur py-3 -mx-4 px-4 rounded-t-xl">
+              <div>
+                {isEdit && <Btn variant="danger" onClick={() => setConfirmDel(true)}>🗑️ Delete event</Btn>}
+              </div>
+              <div className="flex gap-2">
+                <Link to={isEdit ? '/admin/event/' + existing.id : '/admin/schedule'}><Btn variant="ghost">Cancel</Btn></Link>
+                {form.status === 'Draft' || !isEdit ? (
+                  <>
+                    <Btn variant="outline" onClick={() => doSave('Draft')}>Save as draft</Btn>
+                    <Btn onClick={() => doSave('Published')}>📢 Publish</Btn>
+                  </>
+                ) : (
+                  <Btn onClick={() => doSave()}>💾 Save changes</Btn>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <Modal open={confirmDel} onClose={() => setConfirmDel(false)} title="Delete event?">
+            <p className="text-sm text-slate-600">This will permanently remove “<strong>{form.title}</strong>”. This can’t be undone.</p>
+            <div className="flex justify-end gap-2 mt-5">
+              <Btn variant="ghost" onClick={() => setConfirmDel(false)}>Cancel</Btn>
+              <Btn variant="danger" onClick={() => { deleteEvent(existing.id); toast('Event deleted', 'info'); nav('/admin/schedule'); }}>Delete</Btn>
+            </div>
+          </Modal>
+        </div>
+      );
+    };
+
+    const UpdateLog = ({ log }) => (
+      <ol className="relative border-l-2 border-slate-100 ml-1 space-y-4">
+        {[...log].reverse().map((entry, i) => (
+          <li key={i} className="ml-4">
+            <span className="absolute -left-[7px] h-3 w-3 rounded-full bg-accent-500 ring-4 ring-white"></span>
+            <p className="text-sm font-medium text-navy-900">{entry.text}</p>
+            <p className="text-xs text-slate-400">{fmtStamp(entry.time)} · {fmtTimeAgo(entry.time)}</p>
+          </li>
+        ))}
+      </ol>
+    );
+
+    /* ============================================================
+       TEAMS MANAGEMENT
+    ============================================================ */
+    const TeamsPage = () => {
+      const { teams, events, saveTeam, deleteTeam } = useStore();
+      const toast = useToast();
+      const [editing, setEditing] = useState(null); // team obj or {} for new
+      const [confirmDel, setConfirmDel] = useState(null);
+      const blank = { name: '', sport: '', category: "Men's", captain: '', email: '', notes: '' };
+      const [form, setForm] = useState(blank);
+      const [err, setErr] = useState({});
+      const open = (t) => { setForm(t ? { ...t } : blank); setEditing(t || {}); setErr({}); };
+      const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+      const save = () => {
+        const e = {};
+        if (!form.name.trim()) e.name = 'Required';
+        if (!form.sport) e.sport = 'Required';
+        setErr(e); if (Object.keys(e).length) return;
+        saveTeam(form, !!form.id);
+        toast(form.id ? 'Team updated' : 'Team added', 'success');
+        setEditing(null);
+      };
+      const eventCount = (tid) => events.filter(e => e.teamId === tid).length;
+
+      return (
+        <div className="p-4 sm:p-8 max-w-5xl mx-auto fade-in">
+          <PageHeader title="Teams" sub="Manage clubs, squads, captains and contacts." actions={<Btn onClick={() => open(null)}>➕ Add team</Btn>} />
+          {teams.length === 0 ? (
+            <Card><EmptyState icon="👥" title="No teams yet" action={<Btn onClick={() => open(null)}>Add your first team</Btn>} /></Card>
+          ) : (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {teams.map(t => (
+                <Card key={t.id} className="p-5 flex flex-col hover:shadow-cardhover transition">
+                  <div className="flex items-start justify-between">
+                    <div className="h-11 w-11 rounded-xl bg-navy-50 grid place-items-center text-xl">{SPORT_EMOJI[t.sport]}</div>
+                    <span className="text-xs font-semibold text-accent-700 bg-accent-50 rounded-full px-2 py-0.5">{t.category}</span>
+                  </div>
+                  <h3 className="font-bold text-navy-900 mt-3">{t.name}</h3>
+                  <p className="text-sm text-slate-500">{t.sport}</p>
+                  <dl className="text-sm mt-3 space-y-1 flex-1">
+                    {t.captain && <div className="flex gap-2"><dt className="text-slate-400 w-16 shrink-0">Captain</dt><dd className="text-navy-800">{t.captain}</dd></div>}
+                    {t.email && <div className="flex gap-2"><dt className="text-slate-400 w-16 shrink-0">Email</dt><dd className="text-accent-700 truncate">{t.email}</dd></div>}
+                    <div className="flex gap-2"><dt className="text-slate-400 w-16 shrink-0">Events</dt><dd className="text-navy-800">{eventCount(t.id)}</dd></div>
+                  </dl>
+                  {t.notes && <p className="text-xs text-slate-500 mt-2 bg-slate-50 rounded-lg p-2">{t.notes}</p>}
+                  <div className="flex gap-2 mt-4">
+                    <Btn size="sm" variant="outline" className="flex-1" onClick={() => open(t)}>Edit</Btn>
+                    <Btn size="sm" variant="danger" onClick={() => setConfirmDel(t)}>Delete</Btn>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          <Modal open={!!editing} onClose={() => setEditing(null)} title={form.id ? 'Edit team' : 'Add team'} wide>
+            <div className="space-y-4">
+              <Field label="Team name" required><Input value={form.name} onChange={e => set('name', e.target.value)} placeholder="e.g. Men’s Football 1st Team" />{err.name && <p className="text-xs text-rose-600 mt-1">{err.name}</p>}</Field>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <Field label="Sport" required><Select value={form.sport} onChange={e => set('sport', e.target.value)}><option value="">Select…</option>{SPORTS.map(s => <option key={s}>{s}</option>)}</Select>{err.sport && <p className="text-xs text-rose-600 mt-1">{err.sport}</p>}</Field>
+                <Field label="Gender / category"><Select value={form.category} onChange={e => set('category', e.target.value)}>{CATEGORIES.map(c => <option key={c}>{c}</option>)}</Select></Field>
+                <Field label="Captain / coach name"><Input value={form.captain} onChange={e => set('captain', e.target.value)} /></Field>
+                <Field label="Contact email"><Input type="email" value={form.email} onChange={e => set('email', e.target.value)} /></Field>
+              </div>
+              <Field label="Notes"><Textarea value={form.notes} onChange={e => set('notes', e.target.value)} /></Field>
+            </div>
+            <div className="flex justify-end gap-2 mt-5">
+              <Btn variant="ghost" onClick={() => setEditing(null)}>Cancel</Btn>
+              <Btn onClick={save}>{form.id ? 'Save changes' : 'Add team'}</Btn>
+            </div>
+          </Modal>
+
+          <Modal open={!!confirmDel} onClose={() => setConfirmDel(null)} title="Delete team?">
+            <p className="text-sm text-slate-600">Remove “<strong>{confirmDel && confirmDel.name}</strong>”? Existing events keep their data but lose the team link.</p>
+            <div className="flex justify-end gap-2 mt-5">
+              <Btn variant="ghost" onClick={() => setConfirmDel(null)}>Cancel</Btn>
+              <Btn variant="danger" onClick={() => { deleteTeam(confirmDel.id); toast('Team deleted', 'info'); setConfirmDel(null); }}>Delete</Btn>
+            </div>
+          </Modal>
+        </div>
+      );
+    };
+
+    /* ============================================================
+       VENUES MANAGEMENT
+    ============================================================ */
+    const VenuesPage = () => {
+      const { venues, events, saveVenue, deleteVenue } = useStore();
+      const toast = useToast();
+      const [editing, setEditing] = useState(null);
+      const [confirmDel, setConfirmDel] = useState(null);
+      const blank = { name: '', address: '', type: 'Indoor', capacity: '', notes: '' };
+      const [form, setForm] = useState(blank);
+      const [err, setErr] = useState({});
+      const open = (v) => { setForm(v ? { ...v } : blank); setEditing(v || {}); setErr({}); };
+      const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+      const save = () => {
+        const e = {}; if (!form.name.trim()) e.name = 'Required';
+        setErr(e); if (Object.keys(e).length) return;
+        saveVenue(form, !!form.id);
+        toast(form.id ? 'Venue updated' : 'Venue added', 'success');
+        setEditing(null);
+      };
+      const eventCount = (vid) => events.filter(e => e.venueId === vid).length;
+
+      return (
+        <div className="p-4 sm:p-8 max-w-5xl mx-auto fade-in">
+          <PageHeader title="Venues" sub="Manage pitches, courts, halls and off-campus locations." actions={<Btn onClick={() => open(null)}>➕ Add venue</Btn>} />
+          {venues.length === 0 ? (
+            <Card><EmptyState icon="🏟️" title="No venues yet" action={<Btn onClick={() => open(null)}>Add your first venue</Btn>} /></Card>
+          ) : (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {venues.map(v => (
+                <Card key={v.id} className="p-5 flex flex-col hover:shadow-cardhover transition">
+                  <div className="flex items-start justify-between">
+                    <div className="h-11 w-11 rounded-xl bg-navy-50 grid place-items-center text-xl">{v.type === 'Indoor' ? '🏛️' : '🌳'}</div>
+                    <span className={cls('text-xs font-semibold rounded-full px-2 py-0.5', v.type === 'Indoor' ? 'bg-violet-50 text-violet-700' : 'bg-emerald-50 text-emerald-700')}>{v.type}</span>
+                  </div>
+                  <h3 className="font-bold text-navy-900 mt-3">{v.name}</h3>
+                  <p className="text-sm text-slate-500">{v.address || '—'}</p>
+                  <dl className="text-sm mt-3 space-y-1 flex-1">
+                    {v.capacity && <div className="flex gap-2"><dt className="text-slate-400 w-20 shrink-0">Capacity</dt><dd className="text-navy-800">{v.capacity}</dd></div>}
+                    <div className="flex gap-2"><dt className="text-slate-400 w-20 shrink-0">Events</dt><dd className="text-navy-800">{eventCount(v.id)}</dd></div>
+                  </dl>
+                  {v.notes && <p className="text-xs text-slate-500 mt-2 bg-slate-50 rounded-lg p-2">{v.notes}</p>}
+                  <div className="flex gap-2 mt-4">
+                    <Btn size="sm" variant="outline" className="flex-1" onClick={() => open(v)}>Edit</Btn>
+                    <Btn size="sm" variant="danger" onClick={() => setConfirmDel(v)}>Delete</Btn>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          <Modal open={!!editing} onClose={() => setEditing(null)} title={form.id ? 'Edit venue' : 'Add venue'} wide>
+            <div className="space-y-4">
+              <Field label="Venue name" required><Input value={form.name} onChange={e => set('name', e.target.value)} placeholder="e.g. Main Grass Pitch" />{err.name && <p className="text-xs text-rose-600 mt-1">{err.name}</p>}</Field>
+              <Field label="Address"><Input value={form.address} onChange={e => set('address', e.target.value)} /></Field>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <Field label="Indoor / outdoor"><Select value={form.type} onChange={e => set('type', e.target.value)}><option>Indoor</option><option>Outdoor</option></Select></Field>
+                <Field label="Capacity" hint="Optional"><Input value={form.capacity} onChange={e => set('capacity', e.target.value)} placeholder="e.g. 300" /></Field>
+              </div>
+              <Field label="Notes"><Textarea value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Access, parking, equipment rules…" /></Field>
+            </div>
+            <div className="flex justify-end gap-2 mt-5">
+              <Btn variant="ghost" onClick={() => setEditing(null)}>Cancel</Btn>
+              <Btn onClick={save}>{form.id ? 'Save changes' : 'Add venue'}</Btn>
+            </div>
+          </Modal>
+
+          <Modal open={!!confirmDel} onClose={() => setConfirmDel(null)} title="Delete venue?">
+            <p className="text-sm text-slate-600">Remove “<strong>{confirmDel && confirmDel.name}</strong>”?</p>
+            <div className="flex justify-end gap-2 mt-5">
+              <Btn variant="ghost" onClick={() => setConfirmDel(null)}>Cancel</Btn>
+              <Btn variant="danger" onClick={() => { deleteVenue(confirmDel.id); toast('Venue deleted', 'info'); setConfirmDel(null); }}>Delete</Btn>
+            </div>
+          </Modal>
+        </div>
+      );
+    };
+
+    /* ============================================================
+       PUBLIC SCHEDULE
+    ============================================================ */
+    const isPublic = (e) => e.visibility === 'Public' && e.status !== 'Draft';
+
+    const ics = (e, venue) => {
+      const dt = (date, time) => date.replace(/-/g, '') + 'T' + (time || '00:00').replace(':', '') + '00';
+      const body = [
+        'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//ScoreSync//EN', 'BEGIN:VEVENT',
+        'UID:' + e.id + '@scoresync', 'DTSTART:' + dt(e.date, e.startTime),
+        'DTEND:' + dt(e.date, e.endTime || e.startTime), 'SUMMARY:' + e.title,
+        'LOCATION:' + ((venue && venue.name) || ''), 'DESCRIPTION:' + (e.notes || '').replace(/\n/g, ' '),
+        'END:VEVENT', 'END:VCALENDAR',
+      ].join('\r\n');
+      const blob = new Blob([body], { type: 'text/calendar' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = e.title.replace(/[^a-z0-9]/gi, '_') + '.ics'; a.click();
+      URL.revokeObjectURL(url);
+    };
+
+    const PublicScheduleCard = ({ e, teamName, venueName }) => {
+      const dim = e.status === 'Cancelled';
+      const team = teamName(e.teamId);
+      return (
+        <Link to={'/event/' + e.id} className="group block">
+          <div className={cls('relative bg-white rounded-2xl shadow-card hover:shadow-cardhover transition overflow-hidden ring-1 ring-slate-100', dim && 'opacity-75')}>
+            <div className={cls('absolute left-0 inset-y-0 w-1.5', STATUS_STYLES[e.status].bar)}></div>
+            {(e.status === 'Cancelled' || e.status === 'Postponed') && (
+              <div className={cls('text-center text-xs font-bold py-1', e.status === 'Cancelled' ? 'bg-rose-600 text-white' : 'bg-amber-500 text-white')}>
+                {e.status === 'Cancelled' ? '✕ THIS EVENT HAS BEEN CANCELLED' : '⏸ THIS EVENT HAS BEEN POSTPONED'}
+              </div>
+            )}
+            <div className="p-4 pl-5">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500">
+                    <span>{SPORT_EMOJI[e.sport]} {e.sport}</span><span>·</span><span>{e.type}</span>
+                  </div>
+                  <h3 className={cls('font-bold text-navy-900 mt-1 group-hover:text-accent-700', e.status === 'Cancelled' && 'line-through decoration-rose-400')}>{e.title}</h3>
+                  {e.opponent && <p className="text-sm text-slate-600 mt-0.5">{team !== '—' ? team : ''} <span className="text-slate-400">vs</span> {e.opponent} {e.homeAway && <span className="text-xs text-slate-400">({e.homeAway})</span>}</p>}
+                </div>
+                <Badge status={e.status} />
+              </div>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm text-slate-600 mt-3">
+                <span className="flex items-center gap-1.5">🗓️ {fmtDateShort(e.date)}</span>
+                <span className="flex items-center gap-1.5">⏰ {e.startTime}{e.endTime ? '–' + e.endTime : ''}</span>
+                <span className="flex items-center gap-1.5 col-span-2">📍 {venueName(e.venueId)}</span>
+                {e.arrivalTime && <span className="flex items-center gap-1.5 col-span-2 text-accent-700 font-medium">🎒 Arrive by {e.arrivalTime}</span>}
+              </div>
+              {e.notes && <p className="text-sm text-slate-500 mt-2 line-clamp-2 bg-slate-50 rounded-lg p-2">{e.notes}</p>}
+              <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-50">
+                <span className="text-xs text-slate-400">Updated {fmtTimeAgo(e.updatedAt)}</span>
+                <span className="text-sm font-semibold text-accent-600 group-hover:text-accent-700">View details →</span>
+              </div>
+            </div>
+          </div>
+        </Link>
+      );
+    };
+
+    const PublicSchedule = () => {
+      const { events, teams, venues } = useStore();
+      const [filters, setFilters] = useState({ sport: '', team: '', venue: '', type: '', status: '' });
+      const [search, setSearch] = useState('');
+      const [range, setRange] = useState({ from: '', to: '' });
+      const teamName = (id) => (teams.find(t => t.id === id) || {}).name || '—';
+      const venueName = (id) => (venues.find(v => v.id === id) || {}).name || '—';
+
+      const list = useMemo(() => {
+        let l = applyFilters(events.filter(isPublic), filters, search);
+        if (range.from) l = l.filter(e => e.date >= range.from);
+        if (range.to) l = l.filter(e => e.date <= range.to);
+        return l.sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime));
+      }, [events, filters, search, range]);
+
+      const groups = useMemo(() => {
+        const g = {}; list.forEach(e => { (g[e.date] = g[e.date] || []).push(e); });
+        return Object.entries(g);
+      }, [list]);
+
+      return (
+        <div className="min-h-screen">
+          <PublicNav />
+          <div className="bg-navy-900 text-white">
+            <div className="max-w-5xl mx-auto px-4 py-10">
+              <h1 className="text-3xl sm:text-4xl font-extrabold">University Sport Schedule</h1>
+              <p className="text-white/70 mt-2">Every published fixture, training session and event — no login needed.</p>
+            </div>
+          </div>
+          <div className="max-w-5xl mx-auto px-4 py-6">
+            <FilterBar filters={filters} setFilters={setFilters} teams={teams} venues={venues} search={search} setSearch={setSearch}
+              extra={<Select value={filters.status} onChange={e => setFilters(f => ({ ...f, status: e.target.value }))}><option value="">All statuses</option>{['Published', 'Postponed', 'Cancelled', 'Completed'].map(s => <option key={s}>{s}</option>)}</Select>} />
+            <Card className="p-4 mb-5 -mt-2">
+              <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+                <Field label="From date" className="flex-1"><Input type="date" value={range.from} onChange={e => setRange(r => ({ ...r, from: e.target.value }))} /></Field>
+                <Field label="To date" className="flex-1"><Input type="date" value={range.to} onChange={e => setRange(r => ({ ...r, to: e.target.value }))} /></Field>
+                <Btn variant="ghost" onClick={() => { setRange({ from: '', to: '' }); setFilters({ sport: '', team: '', venue: '', type: '', status: '' }); setSearch(''); }}>Clear all</Btn>
+              </div>
+            </Card>
+
+            <p className="text-sm text-slate-500 mb-3">{list.length} event{list.length !== 1 ? 's' : ''}</p>
+
+            {groups.length === 0 ? (
+              <Card><EmptyState icon="📭" title="No events found" sub="Try changing your filters or date range." /></Card>
+            ) : (
+              <div className="space-y-6">
+                {groups.map(([date, evs]) => (
+                  <div key={date}>
+                    <div className="flex items-center gap-3 mb-2 sticky top-16 z-10 bg-navy-50/80 backdrop-blur py-1">
+                      <h2 className="font-bold text-navy-900">{fmtDate(date, { weekday: 'long', day: 'numeric', month: 'long' })}</h2>
+                      {date === todayISO() && <span className="text-xs font-bold text-accent-600 bg-accent-50 px-2 py-0.5 rounded-full">TODAY</span>}
+                    </div>
+                    <div className="grid sm:grid-cols-2 gap-3">
+                      {evs.map(e => <PublicScheduleCard key={e.id} e={e} teamName={teamName} venueName={venueName} />)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <Footer />
+        </div>
+      );
+    };
+
+    /* ============================================================
+       PUBLIC EVENT DETAIL
+    ============================================================ */
+    const EventDetail = ({ id }) => {
+      const { events, teams, venues } = useStore();
+      const toast = useToast();
+      const e = events.find(x => x.id === id);
+      if (!e) return (
+        <div className="min-h-screen"><PublicNav /><div className="max-w-3xl mx-auto px-4 py-16"><Card><EmptyState icon="🤷" title="Event not found" action={<Link to="/schedule"><Btn>Back to schedule</Btn></Link>} /></Card></div></div>
+      );
+      const team = teams.find(t => t.id === e.teamId);
+      const venue = venues.find(v => v.id === e.venueId);
+      const share = async () => {
+        const url = window.location.href;
+        try { await navigator.clipboard.writeText(url); toast('Link copied to clipboard', 'success'); }
+        catch { toast('Share link: ' + url, 'info'); }
+      };
+      const Row = ({ icon, label, value }) => value ? (
+        <div className="flex gap-3 py-2.5 border-b border-slate-50 last:border-0">
+          <span className="text-lg w-6 text-center">{icon}</span>
+          <div><dt className="text-xs text-slate-400 font-semibold uppercase tracking-wide">{label}</dt><dd className="text-navy-900 font-medium">{value}</dd></div>
+        </div>
+      ) : null;
+
+      return (
+        <div className="min-h-screen">
+          <PublicNav />
+          <div className="bg-navy-900 text-white">
+            <div className="max-w-3xl mx-auto px-4 py-8">
+              <Link to="/schedule" className="text-sm text-white/60 hover:text-white">← Back to schedule</Link>
+              {(e.status === 'Cancelled' || e.status === 'Postponed') && (
+                <div className={cls('mt-3 rounded-xl px-4 py-2.5 font-bold text-sm', e.status === 'Cancelled' ? 'bg-rose-600' : 'bg-amber-500')}>
+                  {e.status === 'Cancelled' ? '✕ This event has been cancelled' : '⏸ This event has been postponed — new date to be confirmed'}
+                </div>
+              )}
+              <div className="flex items-center gap-2 mt-4 text-white/70 text-sm font-medium">
+                <span>{SPORT_EMOJI[e.sport]} {e.sport}</span><span>·</span><span>{e.type}</span><span>·</span><span>{e.homeAway}</span>
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-extrabold mt-1">{e.title}</h1>
+              {e.opponent && <p className="text-white/80 mt-1">{team ? team.name : ''} <span className="text-white/40">vs</span> {e.opponent}</p>}
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <Badge status={e.status} />
+                <span className="text-xs text-white/50">Last updated {fmtTimeAgo(e.updatedAt)} ({fmtStamp(e.updatedAt)})</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="max-w-3xl mx-auto px-4 py-6 grid lg:grid-cols-3 gap-5">
+            <div className="lg:col-span-2 space-y-5">
+              <Card className="p-5">
+                <h2 className="font-bold text-navy-900 mb-2">Details</h2>
+                <dl>
+                  <Row icon="🗓️" label="Date" value={fmtDate(e.date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} />
+                  <Row icon="⏰" label="Time" value={e.startTime + (e.endTime ? ' – ' + e.endTime : '')} />
+                  <Row icon="📍" label="Venue" value={venue ? venue.name : '—'} />
+                  <Row icon="🧭" label="Address" value={venue ? venue.address : ''} />
+                  <Row icon="👥" label="Team" value={team ? team.name + ' (' + team.category + ')' : ''} />
+                  <Row icon="🆚" label="Opponent" value={e.opponent} />
+                  <Row icon="🎒" label="Required arrival" value={e.arrivalTime} />
+                  <Row icon="🚌" label="Transport" value={e.transport} />
+                  <Row icon="📝" label="Location notes" value={e.locationNotes} />
+                </dl>
+              </Card>
+
+              {e.notes && (
+                <Card className="p-5">
+                  <h2 className="font-bold text-navy-900 mb-2">Notes for participants</h2>
+                  <p className="text-navy-800 whitespace-pre-line">{e.notes}</p>
+                </Card>
+              )}
+
+              <Card className="p-5">
+                <h2 className="font-bold text-navy-900 mb-2">📋 Update log</h2>
+                <p className="text-xs text-slate-500 mb-3">A record of changes so everyone stays informed.</p>
+                <UpdateLog log={e.log || [{ time: e.updatedAt, text: 'Event created' }]} />
+              </Card>
+            </div>
+
+            <div className="space-y-5">
+              <Card className="p-2">
+                <div className="aspect-video rounded-xl bg-gradient-to-br from-navy-100 to-accent-100 grid place-items-center relative overflow-hidden">
+                  <div className="absolute inset-0 opacity-40" style={{ backgroundImage: 'linear-gradient(#94a3b833 1px, transparent 1px), linear-gradient(90deg, #94a3b833 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
+                  <div className="relative text-center">
+                    <div className="text-4xl">📍</div>
+                    <p className="text-sm font-bold text-navy-900 mt-1">{venue ? venue.name : 'Venue'}</p>
+                    <p className="text-xs text-slate-500">{venue ? venue.address : ''}</p>
+                    <p className="text-[10px] text-slate-400 mt-2">Map preview</p>
+                  </div>
+                </div>
+              </Card>
+              <Card className="p-4 space-y-2">
+                <Btn variant="navy" className="w-full" onClick={() => ics(e, venue)}>📅 Add to Calendar</Btn>
+                <Btn variant="outline" className="w-full" onClick={share}>🔗 Share</Btn>
+              </Card>
+              {venue && venue.notes && (
+                <Card className="p-4">
+                  <h3 className="font-bold text-navy-900 text-sm mb-1">About this venue</h3>
+                  <p className="text-sm text-slate-600">{venue.notes}</p>
+                  <p className="text-xs text-slate-400 mt-2">{venue.type} · {venue.capacity ? 'Capacity ' + venue.capacity : ''}</p>
+                </Card>
+              )}
+            </div>
+          </div>
+          <Footer />
+        </div>
+      );
+    };
+
+    /* ============================================================
+       PUBLIC: SPORTS & VENUES (nav targets)
+    ============================================================ */
+    const PublicSports = () => {
+      const { events, teams } = useStore();
+      const pub = events.filter(isPublic);
+      return (
+        <div className="min-h-screen">
+          <PublicNav />
+          <div className="bg-navy-900 text-white"><div className="max-w-5xl mx-auto px-4 py-10"><h1 className="text-3xl font-extrabold">Sports</h1><p className="text-white/70 mt-2">Browse activity by sport.</p></div></div>
+          <div className="max-w-5xl mx-auto px-4 py-6 grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {SPORTS.map(s => {
+              const count = pub.filter(e => e.sport === s && e.date >= todayISO()).length;
+              const tcount = teams.filter(t => t.sport === s).length;
+              return (
+                <Link key={s} to={'/schedule'} className="block">
+                  <Card className="p-5 hover:shadow-cardhover transition text-center">
+                    <div className="text-4xl">{SPORT_EMOJI[s]}</div>
+                    <h3 className="font-bold text-navy-900 mt-2">{s}</h3>
+                    <p className="text-sm text-slate-500 mt-1">{count} upcoming · {tcount} team{tcount !== 1 ? 's' : ''}</p>
+                  </Card>
+                </Link>
+              );
+            })}
+          </div>
+          <Footer />
+        </div>
+      );
+    };
+
+    const PublicVenues = () => {
+      const { venues, events } = useStore();
+      return (
+        <div className="min-h-screen">
+          <PublicNav />
+          <div className="bg-navy-900 text-white"><div className="max-w-5xl mx-auto px-4 py-10"><h1 className="text-3xl font-extrabold">Venues</h1><p className="text-white/70 mt-2">Where university sport happens.</p></div></div>
+          <div className="max-w-5xl mx-auto px-4 py-6 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {venues.map(v => {
+              const upcoming = events.filter(e => isPublic(e) && e.venueId === v.id && e.date >= todayISO()).length;
+              return (
+                <Card key={v.id} className="p-5">
+                  <div className="flex items-start justify-between">
+                    <div className="h-11 w-11 rounded-xl bg-navy-50 grid place-items-center text-xl">{v.type === 'Indoor' ? '🏛️' : '🌳'}</div>
+                    <span className={cls('text-xs font-semibold rounded-full px-2 py-0.5', v.type === 'Indoor' ? 'bg-violet-50 text-violet-700' : 'bg-emerald-50 text-emerald-700')}>{v.type}</span>
+                  </div>
+                  <h3 className="font-bold text-navy-900 mt-3">{v.name}</h3>
+                  <p className="text-sm text-slate-500">{v.address}</p>
+                  {v.notes && <p className="text-sm text-slate-500 mt-2 bg-slate-50 rounded-lg p-2">{v.notes}</p>}
+                  <p className="text-xs text-accent-700 font-semibold mt-3">{upcoming} upcoming event{upcoming !== 1 ? 's' : ''}</p>
+                </Card>
+              );
+            })}
+          </div>
+          <Footer />
+        </div>
+      );
+    };
+
+    /* ============================================================
+       APP ROOT — state + routing
+    ============================================================ */
+    const RequireAuth = ({ user, children }) => {
+      useEffect(() => { if (!user) nav('/login'); }, [user]);
+      if (!user) return null;
+      return children;
+    };
+
+    const App = () => {
+      const route = useRoute();
+      const [data, setData] = useState(loadState);
+      const [user, setUser] = useState(() => SS.get('ss_user') || null);
+
+      useEffect(() => { LS.set(LS_KEY, JSON.stringify(data)); }, [data]);
+
+      const login = (name) => { setUser(name); SS.set('ss_user', name); };
+      const logout = () => { setUser(null); SS.remove('ss_user'); nav('/'); };
+
+      const saveEvent = (ev, isEdit) => {
+        setData(d => {
+          if (isEdit) {
+            const prev = d.events.find(x => x.id === ev.id);
+            const lines = diffEvents(prev, ev, d);
+            const now = new Date().toISOString();
+            const newLog = [...(prev.log || []), ...lines.map(text => ({ time: now, text }))];
+            return { ...d, events: d.events.map(x => x.id === ev.id ? { ...ev, updatedAt: now, log: newLog } : x) };
+          } else {
+            const now = new Date().toISOString();
+            const newEv = { ...ev, id: uid(), updatedAt: now, log: [{ time: now, text: 'Event created' }] };
+            return { ...d, events: [...d.events, newEv] };
+          }
+        });
+      };
+      const deleteEvent = (eid) => setData(d => ({ ...d, events: d.events.filter(x => x.id !== eid) }));
+      const saveTeam = (t, isEdit) => setData(d => isEdit
+        ? { ...d, teams: d.teams.map(x => x.id === t.id ? t : x) }
+        : { ...d, teams: [...d.teams, { ...t, id: uid() }] });
+      const deleteTeam = (tid) => setData(d => ({ ...d, teams: d.teams.filter(x => x.id !== tid) }));
+      const saveVenue = (v, isEdit) => setData(d => isEdit
+        ? { ...d, venues: d.venues.map(x => x.id === v.id ? v : x) }
+        : { ...d, venues: [...d.venues, { ...v, id: uid() }] });
+      const deleteVenue = (vid) => setData(d => ({ ...d, venues: d.venues.filter(x => x.id !== vid) }));
+      const resetDemo = () => { LS.remove(LS_KEY); setData({ events: seedEvents, teams: seedTeams, venues: seedVenues }); };
+
+      const store = { ...data, saveEvent, deleteEvent, saveTeam, deleteTeam, saveVenue, deleteVenue, resetDemo };
+
+      // ---- ROUTING ----
+      let page;
+      const eventMatch = route.match(/^\/event\/(.+)$/);
+      const adminEventMatch = route.match(/^\/admin\/event\/(.+)$/);
+
+      if (route === '/' || route === '') page = <Landing />;
+      else if (route === '/login') page = <Login onLogin={login} />;
+      else if (route === '/schedule') page = <PublicSchedule />;
+      else if (route === '/sports') page = <PublicSports />;
+      else if (route === '/venues-public') page = <PublicVenues />;
+      else if (eventMatch) page = <EventDetail id={eventMatch[1]} />;
+      else if (route.startsWith('/admin')) {
+        let inner;
+        if (route === '/admin') inner = <Dashboard />;
+        else if (route === '/admin/schedule') inner = <AdminSchedule />;
+        else if (route === '/admin/event/new') inner = <EventForm />;
+        else if (adminEventMatch) inner = <EventForm id={adminEventMatch[1]} />;
+        else if (route === '/admin/teams') inner = <TeamsPage />;
+        else if (route === '/admin/venues') inner = <VenuesPage />;
+        else inner = <Dashboard />;
+        page = (
+          <RequireAuth user={user}>
+            <AdminShell user={user} onLogout={logout} route={route}>{inner}</AdminShell>
+          </RequireAuth>
+        );
+      } else page = <Landing />;
+
+      return (
+        <Store.Provider value={store}>
+          <ToastHost>{page}</ToastHost>
+        </Store.Provider>
+      );
+    };
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+
+  <!-- Bootstrap: transform the app source with the CLASSIC runtime and run it. -->
+  <script>
+    (function () {
+      var root = document.getElementById('root');
+      var fail = function (msg) {
+        root.innerHTML =
+          '<div style="max-width:520px;margin:80px auto;padding:24px;font-family:Inter,system-ui,sans-serif;text-align:center;color:#0b1a2f">'
+          + '<h1 style="font-size:22px;font-weight:800">ScoreSync couldn\'t start</h1>'
+          + '<p style="color:#64748b;margin-top:8px">' + msg + '</p>'
+          + '<p style="color:#94a3b8;margin-top:12px;font-size:13px">This page needs an internet connection the first time (it loads React, Tailwind and Babel from the web). Connect, then reload.</p></div>';
+      };
+      try {
+        if (!window.React || !window.ReactDOM) { fail('Could not load React from the internet.'); return; }
+        if (!window.Babel) { fail('Could not load Babel from the internet.'); return; }
+        var src = document.getElementById('app-source').textContent;
+        // Force the classic runtime so JSX compiles to React.createElement (no import statements).
+        var out = Babel.transform(src, { presets: [['react', { runtime: 'classic' }]] }).code;
+        (0, eval)(out);
+      } catch (err) {
+        fail((err && err.message) ? err.message : 'Unknown error');
+        console.error(err);
+      }
+    })();
+  </script>
+</body>
+</html>
