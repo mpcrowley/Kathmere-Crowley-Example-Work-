@@ -4,67 +4,238 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Kathmere Crowley Example Work</title>
+
   <style>
+    * {
+      box-sizing: border-box;
+    }
+
     body {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      color: #1f2933;
+      background: #f7f7f2;
+      min-height: 100vh;
+    }
+
+    .page {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 40px 28px 72px;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      padding-bottom: 28px;
+      margin-bottom: 56px;
+      border-bottom: 1px solid #d8d8cc;
+    }
+
+    .logo {
+      max-width: 340px;
+      width: 100%;
+      height: auto;
+    }
+
+    .header-label {
       font-family: Arial, sans-serif;
-      max-width: 900px;
-      margin: 60px auto;
-      padding: 0 24px;
-      line-height: 1.6;
-      color: #222;
-      background: #fafafa;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #0f4f1f;
+      border: 1px solid #0f4f1f;
+      padding: 8px 12px;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+
+    .hero {
+      margin-bottom: 46px;
     }
 
     h1 {
-      font-size: 42px;
-      margin-bottom: 10px;
+      margin: 0;
+      max-width: 850px;
+      font-size: clamp(44px, 6vw, 74px);
+      line-height: 1.02;
+      letter-spacing: -0.04em;
+      color: #0f4f1f;
+      font-weight: 700;
     }
 
     .subtitle {
-      font-size: 20px;
-      color: #555;
-      margin-bottom: 40px;
+      max-width: 720px;
+      margin-top: 22px;
+      font-family: Arial, sans-serif;
+      font-size: 21px;
+      line-height: 1.6;
+      color: #4b5563;
+    }
+
+    .section-title {
+      margin: 0 0 18px;
+      font-size: 28px;
+      color: #111827;
+    }
+
+    .projects {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 24px;
     }
 
     .project-card {
-      background: white;
-      border: 1px solid #ddd;
-      border-radius: 12px;
-      padding: 24px;
-      margin-bottom: 20px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+      position: relative;
+      overflow: hidden;
+      background: #ffffff;
+      border: 1px solid #d8d8cc;
+      border-radius: 18px;
+      padding: 32px;
+      box-shadow: 0 16px 36px rgba(31, 41, 51, 0.08);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .project-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 22px 48px rgba(31, 41, 51, 0.12);
+    }
+
+    .project-card::before {
+      content: "";
+      position: absolute;
+      inset: 0 0 auto 0;
+      height: 6px;
+      background: linear-gradient(90deg, #0f4f1f, #2f7d32);
     }
 
     .project-card h2 {
-      margin-top: 0;
+      margin: 16px 0 12px;
+      font-size: 32px;
+      letter-spacing: -0.03em;
+      color: #111827;
     }
 
     .project-card p {
-      color: #555;
+      margin: 0 0 24px;
+      font-family: Arial, sans-serif;
+      color: #4b5563;
+      font-size: 17px;
+      line-height: 1.65;
+    }
+
+    .tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 26px;
+    }
+
+    .tag {
+      font-family: Arial, sans-serif;
+      padding: 7px 10px;
+      border-radius: 999px;
+      background: #eef5ee;
+      color: #0f4f1f;
+      border: 1px solid #c8ddc8;
+      font-size: 13px;
+      font-weight: 700;
     }
 
     .project-card a {
-      display: inline-block;
-      margin-top: 10px;
-      color: #0969da;
-      font-weight: bold;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-family: Arial, sans-serif;
+      color: white;
+      background: #0f4f1f;
+      padding: 12px 17px;
+      border-radius: 10px;
+      font-weight: 800;
       text-decoration: none;
+      transition: background 0.2s ease;
     }
 
     .project-card a:hover {
-      text-decoration: underline;
+      background: #093814;
+    }
+
+    footer {
+      margin-top: 56px;
+      padding-top: 20px;
+      border-top: 1px solid #d8d8cc;
+      font-family: Arial, sans-serif;
+      color: #6b7280;
+      font-size: 14px;
+    }
+
+    @media (max-width: 720px) {
+      .page {
+        padding: 28px 20px 56px;
+      }
+
+      header {
+        align-items: flex-start;
+        flex-direction: column;
+        margin-bottom: 42px;
+      }
+
+      .logo {
+        max-width: 290px;
+      }
+
+      .subtitle {
+        font-size: 18px;
+      }
+
+      .project-card {
+        padding: 26px;
+      }
     }
   </style>
 </head>
-<body>
-  <h1>Kathmere Crowley Example Work</h1>
-  <p class="subtitle">A portfolio of AI-related work I have done.</p>
 
-  <div class="project-card">
-    <h2>YKK Pitch Deck</h2>
-    <p>An AI-assisted pitch deck project created as part of my example work portfolio.</p>
-    <a href="ykk-pitch-deck.html">View Project →</a>
-  </div>
-  
+<body>
+  <main class="page">
+    <header>
+      <img class="logo" src="kathmere-logo.png" alt="Kathmere Capital Management logo" />
+      <div class="header-label">AI Example Work</div>
+    </header>
+
+    <section class="hero">
+      <h1>Kathmere Crowley Example Work</h1>
+      <p class="subtitle">
+        A curated portfolio of AI-related projects, concepts, and example work.
+      </p>
+    </section>
+
+    <section>
+      <h2 class="section-title">Projects</h2>
+
+      <div class="projects">
+        <div class="project-card">
+          <h2>YKK Pitch Deck</h2>
+          <p>
+            An AI-assisted pitch deck project created as part of my example work portfolio.
+          </p>
+
+          <div class="tags">
+            <span class="tag">Pitch Deck</span>
+            <span class="tag">AI-Assisted</span>
+            <span class="tag">Strategy</span>
+          </div>
+
+          <a href="ykk-pitch-deck.html">View Project →</a>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      Built to showcase selected AI-related work.
+    </footer>
+  </main>
 </body>
 </html>
