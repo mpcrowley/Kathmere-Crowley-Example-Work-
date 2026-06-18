@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Advisor Operations Command Center</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <!-- ============ Header ============ -->
+    <header class="site-header">
+      <div class="header-inner">
+        <h1>Advisor Operations Command Center</h1>
+        <p class="subtitle">
+          Prototype dashboard for monitoring meeting readiness, follow-up
+          accountability, and advisor workflow bottlenecks.
+        </p>
+        <span class="header-label">Mock data • Rule-based insights • Workflow visibility</span>
+      </div>
+    </header>
+
+    <main class="dashboard">
+      <!-- ============ Filter bar ============ -->
+      <section class="filter-bar" aria-label="Filters">
+        <div class="filter">
+          <label for="filter-advisor">Advisor</label>
+          <select id="filter-advisor"></select>
+        </div>
+        <div class="filter">
+          <label for="filter-client-type">Client Type</label>
+          <select id="filter-client-type"></select>
+        </div>
+        <div class="filter">
+          <label for="filter-prep-status">Prep Status</label>
+          <select id="filter-prep-status"></select>
+        </div>
+        <div class="filter">
+          <label for="filter-task-status">Task Status</label>
+          <select id="filter-task-status"></select>
+        </div>
+        <div class="filter">
+          <label for="filter-workflow-area">Workflow Area</label>
+          <select id="filter-workflow-area"></select>
+        </div>
+        <button id="reset-filters" class="btn btn-ghost" type="button">Reset</button>
+      </section>
+
+      <!-- ============ KPI cards ============ -->
+      <section class="kpi-grid" id="kpi-grid" aria-label="Key metrics"></section>
+
+      <!-- ============ Meeting Readiness ============ -->
+      <section class="panel">
+        <div class="panel-header">
+          <h2>Meeting Readiness</h2>
+          <p class="panel-note">Prep status across upcoming client meetings.</p>
+        </div>
+        <div class="chart" id="meeting-chart" aria-label="Meeting prep status chart"></div>
+        <div class="table-wrap">
+          <table id="meetings-table">
+            <thead>
+              <tr>
+                <th>Client</th>
+                <th>Advisor</th>
+                <th>Meeting Date</th>
+                <th>Days Until</th>
+                <th>Client Type</th>
+                <th>Prep Status</th>
+                <th>Missing Items</th>
+                <th>Planning Topics</th>
+              </tr>
+            </thead>
+            <tbody id="meetings-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ============ Follow-Up Accountability ============ -->
+      <section class="panel">
+        <div class="panel-header">
+          <h2>Follow-Up Accountability</h2>
+          <p class="panel-note">Open workload by owner and task status.</p>
+        </div>
+        <div class="chart" id="task-chart" aria-label="Owner workload chart"></div>
+        <div class="table-wrap">
+          <table id="tasks-table">
+            <thead>
+              <tr>
+                <th>Task</th>
+                <th>Client</th>
+                <th>Owner</th>
+                <th>Due Date</th>
+                <th>Days Overdue</th>
+                <th>Status</th>
+                <th>Workflow Area</th>
+              </tr>
+            </thead>
+            <tbody id="tasks-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ============ Rule-Based Workflow Insights ============ -->
+      <section class="panel">
+        <div class="panel-header">
+          <h2>Rule-Based Workflow Insights</h2>
+          <p class="panel-note">
+            These insights are rule-based in this prototype. In production, Claude
+            or ChatGPT could summarize, prioritize, and explain workflow risks using
+            approved firm data.
+          </p>
+        </div>
+        <ul class="attention-list" id="attention-list"></ul>
+      </section>
+
+      <!-- ============ Weekly Operations Brief ============ -->
+      <section class="panel">
+        <div class="panel-header">
+          <h2>Weekly Operations Brief</h2>
+          <p class="panel-note">
+            Generate a shareable markdown summary of this week's workflow health.
+          </p>
+        </div>
+        <div class="brief-actions">
+          <button id="generate-brief" class="btn btn-primary" type="button">
+            Generate Weekly Operations Brief
+          </button>
+        </div>
+        <div class="brief-panel" id="brief-panel" hidden></div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <p>
+        Workflow visibility and operations intelligence prototype • Mock data only •
+        Not a financial advice tool.
+      </p>
+    </footer>
+
+    <script src="data.js"></script>
+    <script src="script.js"></script>
+  </body>
+</html>
