@@ -29,6 +29,27 @@
     text-rendering:optimizeLegibility;
   }
 
+    .back-link {
+    position: fixed;
+    top: 24px;
+    left: 24px;
+    z-index: 9999;
+    display: inline-block;
+    padding: 10px 16px;
+    border-radius: 999px;
+    background: #0f4f1f;
+    color: white;
+    font-family: Arial, sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    text-decoration: none;
+    box-shadow: 0 8px 20px rgba(31, 41, 51, 0.18);
+  }
+  
+  .back-link:hover {
+    background: #093814;
+  }
+    
   /* ===== Slide deck ===== */
   .deck{position:fixed;inset:0;}
   /* soft depth for light-theme surfaces */
@@ -261,6 +282,7 @@
 </style>
 </head>
 <body>
+<a class="back-link" href="index.html">← Back to Portfolio</a>
 <div class="progress" id="progress"></div>
 <div class="deck" id="deck">
 
