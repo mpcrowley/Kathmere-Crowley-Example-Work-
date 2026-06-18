@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Day Recap</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="page">
+    <header class="header">
+      <h1 class="title">Day Recap</h1>
+      <p class="subtitle">
+        A simple reflection tool for turning the day into a clear summary and focus for tomorrow.
+      </p>
+      <p class="label">No external APIs &bull; Rule-based reflection logic &bull; Personal workflow prototype</p>
+    </header>
+
+    <main class="layout">
+      <!-- Input form -->
+      <section class="card" aria-labelledby="form-heading">
+        <h2 id="form-heading" class="card-title">End of Day Check-In</h2>
+
+        <form id="journal-form" autocomplete="off">
+          <div class="sliders">
+            <div class="slider-row">
+              <label for="mood">Mood <span class="slider-value" id="mood-value">5</span></label>
+              <input type="range" id="mood" min="1" max="10" value="5" />
+            </div>
+            <div class="slider-row">
+              <label for="energy">Energy <span class="slider-value" id="energy-value">5</span></label>
+              <input type="range" id="energy" min="1" max="10" value="5" />
+            </div>
+            <div class="slider-row">
+              <label for="focus">Focus <span class="slider-value" id="focus-value">5</span></label>
+              <input type="range" id="focus" min="1" max="10" value="5" />
+            </div>
+            <div class="slider-row">
+              <label for="stress">Stress <span class="slider-value" id="stress-value">5</span></label>
+              <input type="range" id="stress" min="1" max="10" value="5" />
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Three things I'm grateful for</label>
+            <input type="text" id="gratitude1" placeholder="First..." />
+            <input type="text" id="gratitude2" placeholder="Second..." />
+            <input type="text" id="gratitude3" placeholder="Third..." />
+          </div>
+
+          <div class="field">
+            <label for="lesson">Lesson learned today</label>
+            <textarea id="lesson" rows="2" placeholder="What did today teach you?"></textarea>
+          </div>
+
+          <div class="field">
+            <label for="success">Biggest success today</label>
+            <textarea id="success" rows="2" placeholder="What went well?"></textarea>
+          </div>
+
+          <div class="field">
+            <label for="unfinished">Is there anything I didn't accomplish that I wanted to?</label>
+            <textarea id="unfinished" rows="2" placeholder="Anything left undone?"></textarea>
+          </div>
+
+          <div class="field">
+            <label for="notes">Any other notes from the day?</label>
+            <textarea id="notes" rows="2" placeholder="Loose thoughts, moments, reminders..."></textarea>
+          </div>
+
+          <div class="field">
+            <label for="tomorrow">Main focus for tomorrow</label>
+            <textarea id="tomorrow" rows="2" placeholder="One clear focus for tomorrow..."></textarea>
+          </div>
+
+          <div class="buttons">
+            <button type="button" id="generate-btn" class="btn btn-primary">Day Insights</button>
+            <button type="button" id="reset-btn" class="btn btn-ghost">Reset</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- Output -->
+      <section class="card output-card" id="output-card" aria-live="polite" hidden>
+        <div id="output"></div>
+      </section>
+
+      <section class="card output-placeholder" id="placeholder">
+        <p>Fill in the day, then click <strong>Day Insights</strong> for a short report you can actually take away.</p>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>This is a personal reflection prototype, not medical or mental health advice.</p>
+    </footer>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
