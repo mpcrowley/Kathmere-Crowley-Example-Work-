@@ -1838,21 +1838,28 @@
   </script>
 
   <script>
-    document.addEventListener("click", function (event) {
-      const clickedText = event.target.innerText || "";
+    function updateBackButtonVisibility() {
+      const backLink = document.querySelector(".back-link");
   
-      if (clickedText.includes("Admin Login")) {
+      if (!backLink) return;
+  
+      const pageText = document.body.innerText || "";
+  
+      const isSignedInAdmin =
+        pageText.includes("Demo Admin") &&
+        pageText.includes("Administrator") &&
+        pageText.includes("Sign out");
+  
+      if (isSignedInAdmin) {
         document.body.classList.add("admin-view");
-      }
-  
-      if (
-        clickedText.includes("Public Schedule") ||
-        clickedText.includes("Public View") ||
-        clickedText.includes("Schedule") ||
-        clickedText.includes("ScoreSync")
-      ) {
+      } else {
         document.body.classList.remove("admin-view");
       }
+    }
+  
+    document.addEventListener("DOMContentLoaded", updateBackButtonVisibility);
+    document.addEventListener("click", function () {
+      setTimeout(updateBackButtonVisibility, 150);
     });
   </script>
   
