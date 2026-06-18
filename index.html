@@ -89,10 +89,10 @@
       color: #111827;
     }
 
-    .projects {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 24px;
+        .projects {
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
     }
 
     .project-card {
@@ -102,6 +102,7 @@
       border: 1px solid #d8d8cc;
       border-radius: 18px;
       padding: 32px;
+      width: 100%;
       box-shadow: 0 16px 36px rgba(31, 41, 51, 0.08);
       transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
