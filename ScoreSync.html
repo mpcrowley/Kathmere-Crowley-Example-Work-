@@ -1838,30 +1838,21 @@
   </script>
 
   <script>
-    function updateBackButtonForAdminView() {
-      const body = document.body;
+    document.addEventListener("click", function (event) {
+      const clickedText = event.target.innerText || "";
   
-      const adminIndicators = [
-        "Dashboard",
-        "Create New Event",
-        "Demo Admin",
-        "Administrator"
-      ];
-  
-      const pageText = document.body.innerText || "";
-      const isAdminView = adminIndicators.some(text => pageText.includes(text));
-  
-      if (isAdminView) {
-        body.classList.add("admin-view");
-      } else {
-        body.classList.remove("admin-view");
+      if (clickedText.includes("Admin Login")) {
+        document.body.classList.add("admin-view");
       }
-    }
   
-    document.addEventListener("DOMContentLoaded", updateBackButtonForAdminView);
-  
-    document.addEventListener("click", function () {
-      setTimeout(updateBackButtonForAdminView, 100);
+      if (
+        clickedText.includes("Public Schedule") ||
+        clickedText.includes("Public View") ||
+        clickedText.includes("Schedule") ||
+        clickedText.includes("ScoreSync")
+      ) {
+        document.body.classList.remove("admin-view");
+      }
     });
   </script>
   
