@@ -364,3 +364,28 @@ textarea:focus {
     font-size: 1.7rem;
   }
 }
+
+.back-link {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 9999;
+  display: inline-block;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: #e8f1ec;
+  color: #2f5f4f;
+  border: 1px solid rgba(47, 95, 79, 0.22);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-decoration: none;
+  box-shadow: 0 8px 20px rgba(47, 95, 79, 0.10);
+}
+
+.back-link:hover {
+  background: #dcebe3;
+  color: #244c3f;
+}
