@@ -704,3 +704,24 @@ video.preview { width: 100%; border-radius: 14px; margin-top: 8px; background: #
 .review-line:last-child { border-bottom: none; }
 .review-line .rl-k { color: var(--muted); }
 .review-line .rl-v { font-weight: 600; text-align: right; }
+
+.back-link {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 9999;
+  display: inline-block;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #8DB8E8, #A29BEA);
+  color: white;
+  font-family: Arial, sans-serif;
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: none;
+  box-shadow: 0 8px 20px rgba(141, 184, 232, 0.35);
+}
+
+.back-link:hover {
+  background: linear-gradient(135deg, #7AA9DE, #9188E0);
+}
